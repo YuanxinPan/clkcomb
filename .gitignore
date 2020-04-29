@@ -1,0 +1,11 @@
+bin/
+data/
+output
+tmp
+*.clk
+*.bia
+fixed/
+float/
+clkcomb
+apps/comclk
+apps/backup
