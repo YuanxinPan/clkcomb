@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
         return 1;
 
     std::vector<Satellite> sats;
-    if (!init_sats(config.prns, sats))
+    if (!init_sats(config, sats))
         return 1;
 
     const size_t nac_total  = acs.size();
@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
     std::vector<std::vector<double>> comb_clks;
     construct_initclk(config, acs, sats, comb_clks);
 
+    bool weight_ac = false;
     // Iteration
     std::vector<std::vector<double>> clk_wgts(nac_total, std::vector<double>(nsat_total));
     int niter = 0;
@@ -137,7 +138,7 @@ int main(int argc, char *argv[])
             double clk_std; // std_sum = 0;
             for (size_t iprn=0; iprn!=nsat_total; ++iprn) {
                 fprintf(stdout, "## %3s %3s  \n", acs[i].name.c_str(), config.prns[iprn].c_str());
-                remove_clock_bias(acs[i].name, config.prns[iprn], acs[i].sat_clks[iprn], comb_clks[iprn],
+                remove_clock_bias(acs[i].name, sats[iprn], acs[i].sat_clks[iprn], comb_clks[iprn],
                                   config.phase_clock, clk_std, niter!=1);
                 // remove_clock_bias(acs[i].sat_clks[iprn], comb_clks[iprn], clk_std, true);
                 // if (niter == 1 && clk_std != 0.0) {
@@ -167,13 +168,38 @@ int main(int argc, char *argv[])
 
             if (niter==1) write_satclks(stdout, config, acs[i].name, acs[i].sat_clks);
 
-            // Weight
-            // for (size_t i=0; i!=nac_total; ++i) {
-            //     clk_wgts[i][iprn] = 1/clk_stds[i][iprn];
-            //    // clk_wgts[i][iprn] = pow(1- clk_stds[i][iprn]/std_sum, 2);
-            // }
+            // clk_wgts[i][iprn] = 1/clk_stds[i][iprn];
+            // clk_wgts[i][iprn] = pow(1- clk_stds[i][iprn]/std_sum, 2);
         }
 
+        // AC weight
+        if (weight_ac) {
+            std::vector<double> std_sums(nac_total);
+            for (size_t isat=0; isat!=nsat_total; ++isat)
+            {
+                bool usable = true;
+                for (size_t iac=0; iac!=nac_total; ++iac) {
+                    if (clk_stds[iac][isat] == 99.9) {
+                        usable = false;
+                        break;
+                    }
+                }
+                if (!usable)
+                    continue;
+                for (size_t iac=0; iac!=nac_total; ++iac)
+                    std_sums[iac] += clk_stds[iac][isat];
+            }
+
+            double std_sum = std::accumulate(std_sums.begin(), std_sums.end(), 0.0);
+            for (size_t iac=0; iac!=nac_total; ++iac) {
+                double wgt = std_sum/std_sums[iac];
+                clk_wgts[iac].assign(nsat_total, wgt);
+                fprintf(stdout, "AC weight: %3s %8.3f\n", acs[iac].name.c_str(), wgt);
+            }
+
+        }
+
+        // ouput weight
         for (size_t iprn=0; iprn!=nsat_total; ++iprn) {
             fprintf(stdout, "weight  %3s ", config.prns[iprn].c_str());
             double wgt_sum = 0;
@@ -304,7 +330,7 @@ int main(int argc, char *argv[])
 
     if (config.phase_clock) {
         std::string bia_file = replace_pattern(config.bia_pattern, config.mjd, "xxx");
-        write_bias(bia_file, config.mjd, config.prns, acs[0].wl_bias);
+        write_bias(bia_file, config.mjd, sats, acs[0].wl_bias);
     }
 
     return 0;

@@ -16,6 +16,7 @@ public:
     private:
         friend class RinexAtx;
         std::string name;
+        std::string svn;
         int nfreq;
         std::vector<std::array<double,3>> pcos;  // nfreq
         double dazi;
@@ -27,6 +28,7 @@ public:
         void pco(double *pco)const;
         void pco(const double *xsat, const double *vsat, const double *xsun, double *pco)const;
         double pcv(double zen, double azi)const;
+        inline const std::string &SVN()const { return svn; }
         inline const double *R()const { return R_; }
         inline friend bool operator==(const atx_t &atx, const std::string &ant) {
             return atx.name == ant;

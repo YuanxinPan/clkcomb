@@ -11,6 +11,7 @@ public:
     explicit Satellite(const std::string &_prn) : prn(_prn) {}
 
     std::string prn;
+    std::string svn;
     double f[2];
     double waveLen[2];
 };

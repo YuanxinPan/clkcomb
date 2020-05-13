@@ -7,5 +7,6 @@ tmp
 fixed/
 float/
 clkcomb
+!apps/clkcomb
 apps/comclk
 apps/backup

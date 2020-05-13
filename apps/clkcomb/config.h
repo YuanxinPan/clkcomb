@@ -33,7 +33,7 @@ typedef struct TAGCONFIG
     std::string erp_pattern; // ERP file
 
     // table path
-    // std::string atx_path; // IGS atx
+    std::string atx_path; // IGS atx
     // std::string eph_path; // JPL ephmeris
     // std::string lps_path; // leap second
     // std::string chn_path; // glonass channel

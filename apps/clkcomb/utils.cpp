@@ -4,6 +4,7 @@
 #include <numeric>
 #include <pppx/io.h>
 #include <pppx/const.h>
+#include <pppx/rinex.h>
 
 std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix,
@@ -113,10 +114,18 @@ bool sat_freq(const std::string &prn, double f[])
     return true;
 }
 
-bool init_sats(const std::vector<std::string> &prns, std::vector<Satellite> &sats)
+bool init_sats(const config_t &config, std::vector<Satellite> &sats)
 {
+    RinexAtx rnxatx;
+    if (!rnxatx.open(config.atx_path))
+        return false;
+
+    MJD t = config.mjd;
+    t.sod = 43200;
+    const RinexAtx::atx_t *atx = nullptr;
+
     sats.clear();
-    for (auto it=prns.begin(); it!=prns.end(); ++it) {
+    for (auto it=config.prns.begin(); it!=config.prns.end(); ++it) {
         sats.emplace_back(*it);
         Satellite &sat = sats.back();
 
@@ -124,6 +133,11 @@ bool init_sats(const std::vector<std::string> &prns, std::vector<Satellite> &sat
             return false;
         sat.waveLen[0] = LightSpeed/sat.f[0];
         sat.waveLen[1] = LightSpeed/sat.f[1];
+
+        atx = rnxatx.atx(t, sat.prn);
+        if (nullptr != atx) {
+            sat.svn = atx->SVN();
+        }
     }
     return true;
 }
@@ -499,14 +513,14 @@ void remove_clkbias_seg(const std::string &name, const std::string &prn,
 }
 
 // void remove_clock_bias(const std::string &prn,
-void remove_clock_bias(const std::string &name, const std::string &prn,
+void remove_clock_bias(const std::string &name, const Satellite &sat,
                        std::vector<double> &sat_clks,
                        const std::vector<double> &ref_clks,
                        bool phase_clock, double &std, bool edit)
 {
     // if (!edit && !phase_clock) {
     if (!edit) {
-        remove_clkbias_seg(name, prn, sat_clks, ref_clks, phase_clock);
+        remove_clkbias_seg(name, sat.prn, sat_clks, ref_clks, phase_clock);
         return;
     }
 
@@ -547,9 +561,7 @@ void remove_clock_bias(const std::string &name, const std::string &prn,
     std = sqrt(sum/count);
 
     if (phase_clock) {
-        double f[2];
-        sat_freq(prn, f);
-        double waveNL = 1E9/(f[0] + f[1]); // ns
+        double waveNL = 1E9/(sat.f[0] + sat.f[1]); // ns
         bias = floor(bias/waveNL + 0.5)*waveNL;
     }
     for (auto it=sat_clks.begin(); it!=sat_clks.end(); ++it) {
@@ -695,8 +707,21 @@ bool write_clkfile(const std::string &path, MJD t, int length, int interval,
         }
     }
 
+    // leap second
+    int init_leapsec = 21;
+    std::vector<int> leap_mjds = { 45150, 45515, 46246, 47160, 47891, 48256, 48803,
+                                   49168, 49533, 50082, 50629, 51178, 53735, 54831,
+                                   56108, 57203, 57753, 59030 };
+    auto it = std::lower_bound(leap_mjds.begin(), leap_mjds.end(), t.d);
+    if (it == leap_mjds.end()) {
+        fprintf(stderr, MSG_ERR "write_clkfile: %d out of leap_mjds range [%d, %d]\n", t.d, leap_mjds.front(), leap_mjds.back());
+        return false;
+    }
+    int leap_sec = init_leapsec + (it-leap_mjds.begin()) - 1 - 19;
+
     // write header
     fprintf(fp, "     2.00           CLOCK DATA                              RINEX VERSION / TYPE\n");
+    fprintf(fp, "    %2d                                                      LEAP SECONDS        \n", leap_sec);
     fprintf(fp, "   %3lu %73s\n", valid_prns.size(), "# OF SOLN SATS      ");
     size_t n = (valid_prns.size()+14)/15*15;
     for (size_t i=0; i!=n; ++i) {
@@ -743,7 +768,7 @@ static void convert2raw_bias(double wl, const double f[], double raw[])
 }
 
 bool write_bias(const std::string &path, MJD t,
-                const std::vector<std::string> &prns,
+                const std::vector<Satellite> &sats,
                 const std::vector<double> &wl_bias)
 {
     FILE *fp = fopen(path.c_str(), "w");
@@ -756,17 +781,16 @@ bool write_bias(const std::string &path, MJD t,
     fprintf(fp, "+BIAS/SOLUTION\n");
     fprintf(fp, "*BIAS SVN_ PRN STATION__ OBS1 OBS2 BIAS_START____ BIAS_END______ UNIT __ESTIMATED_VALUE____ _STD_DEV___ __ESTIMATED_SLOPE____ _STD_DEV___\n");
 
-    const size_t nsat = prns.size();
+    const size_t nsat = sats.size();
     int y, doy;
-    double f[2], raw[4];
+    double raw[4];
     const char *types[4] = { "C1W", "C2W", "L1C", "L2W" };
     mjd2doy(t.d, &y, &doy);
     for (size_t i=0; i!=nsat; ++i) {
-        sat_freq(prns[i], f);
-        convert2raw_bias(wl_bias[i], f, raw);
+        convert2raw_bias(wl_bias[i], sats[i].f, raw);
         for (int j=0; j!=4; ++j)
             fprintf(fp, " OSB  %4s %3s %9s %-4s %-4s %4d:%03d:%05d %4d:%03d:%05d %-4s %21.3f %11.3f\n",
-                    "SVN_", prns[i].c_str(), "", types[j], "", y, doy, 0, y, doy+1, 0, "ns", raw[j], 0.0);
+                    sats[i].svn.c_str(), sats[i].prn.c_str(), "", types[j], "", y, doy, 0, y, doy+1, 0, "ns", raw[j], 0.0);
     }
 
     fprintf(fp, "-BIAS/SOLUTION\n");

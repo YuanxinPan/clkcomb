@@ -197,6 +197,8 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)
             // check whether required
             if (atx.name != ant)
                 skip_atx(atxFile_);
+            else if (issatatx)
+                atx.svn.assign(buf+40, 4);
         }
         else if (strncmp(buf+60, "DAZI", 4) == 0)
             sscanf(buf, "%lf", &atx.dazi);
