@@ -13,7 +13,8 @@ std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix=std::string(),
                             const std::string &suffix=std::string());
 
-bool init_acs(const config_t &config, std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac);
+bool init_acs(const config_t &config, const std::vector<Satellite> &sats,
+              std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac);
 
 bool init_sats(const config_t &config, std::vector<Satellite> &sats);
 
@@ -34,6 +35,11 @@ void remove_clock_datum(std::vector<std::vector<double>> &sat_clks,
                         const std::vector<int> &adjust_prns,
                         const std::vector<int> &common_prns);
 
+void align_clock_datum(std::vector<std::vector<double>> &sat_clks,
+                       std::vector<std::vector<double>> &ref_clks,
+                       const std::vector<int> &adjust_prns,
+                       const std::vector<int> &common_prns);
+
 double satclk_std(const std::vector<double> &clks, const std::vector<double> &refs, double T);
 
 // void remove_clock_bias(const std::string &prn,
@@ -52,9 +58,14 @@ void combine_one_epoch(const std::vector<double> &clks,
 void write_satclks(FILE *fp, const config_t &config, const std::string &acn,
                    const std::vector<std::vector<double>> &sat_clks);
 
-void compare_satclks(const config_t &config,
+void write_satclks_diff(FILE *fp, const config_t &config, const std::string &acn,
+                   const std::vector<std::vector<double>> &sat_clks,
+                   const std::vector<std::vector<double>> &ref_clks);
+
+void compare_satclks(const config_t &config, const std::string &name,
                      const std::vector<std::vector<double>> &sat_clks,
-                     const std::vector<std::vector<double>> &ref_clks);
+                     const std::vector<std::vector<double>> &ref_clks,
+                     bool epoch_output);
 
 bool write_clkfile(const std::string &path, MJD t, int length, int interval,
                    const std::vector<std::string> &prns,

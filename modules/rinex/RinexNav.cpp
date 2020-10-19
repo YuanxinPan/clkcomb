@@ -18,7 +18,7 @@ bool RinexNav::Header::read(FILE *fp)
         return false;
     }
     version = atof(buf+5);
-    if (version < 2.00 || version > 3.03) {
+    if (version < 2.00 || version > 3.04) {
         fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
                 "RinexNav::Header::read: unknown version: %4.2f\n", version);
         return false;

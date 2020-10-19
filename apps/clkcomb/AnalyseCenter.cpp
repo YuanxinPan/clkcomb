@@ -67,12 +67,13 @@ bool AnalyseCenter::read_clock(MJD t, int length, int interval,
     return true;
 }
 
-bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::string> &prns)
+bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::string> &prns,
+                              const std::vector<Satellite> &sats)
 {
     if (name == "grg") {
         return read_grg_bias(clk_file, prns);
     } else if (name == "cod" || name == "whu") {
-        return read_snx_bias(bia_file, prns);
+        return read_snx_bias(bia_file, prns, sats);
     } else {
         fprintf(stdout, MSG_ERR "AnalyseCenter::read_bias: unsupported ac: %3s\n", name.c_str());
         return false;
@@ -133,7 +134,8 @@ static void convert_bias(const double f[], const std::array<double, 4> &bias, do
     nl = (bias[0]*alpha + bias[1]*beta)*fn/1E9;
 }
 
-bool AnalyseCenter::read_snx_bias(const std::string &path, const std::vector<std::string> &prns)
+bool AnalyseCenter::read_snx_bias(const std::string &path, const std::vector<std::string> &prns,
+                                  const std::vector<Satellite> &sats)
 {
     FILE *fp = fopen(path.c_str(), "r");
     if (fp == nullptr) {
@@ -161,24 +163,21 @@ bool AnalyseCenter::read_snx_bias(const std::string &path, const std::vector<std
             continue;
         auto it = std::lower_bound(prns.begin(), prns.end(), prn);
         index =  it - prns.begin();
-        have_bias[index] = 1;
 
-        if (!strncmp(buf+25, "L1W", 3) || !strncmp(buf+25, "L1C", 3)) {
-            bias[index][0] = val;
-        } else if (!strncmp(buf+25, "L2W", 3)) {
-            bias[index][1] = val;
-        } else if (!strncmp(buf+25, "C1W", 3)) {
-            bias[index][2] = val;
-        } else if (!strncmp(buf+25, "C2W", 3)) {
-            bias[index][3] = val;
-        }
+        have_bias[index] = 1;
+        for (int i=0; i!=4; ++i) // L1 L2 P1 P2
+            if (!strncmp(buf+25, sats[index].obstp[i].c_str(), 3)) {
+                bias[index][i] = val;
+                break;
+            }
     }
 
-    double f[2];
     for (size_t i=0; i!=prns.size(); ++i) {
-        if (!sat_freq(prns[i], f))
-            return false;
-        convert_bias(f, bias[i], wl_bias[i], nl_bias[i]);
+        if (!have_bias[i])
+            continue;
+        convert_bias(sats[i].f, bias[i], wl_bias[i], nl_bias[i]);
+        fprintf(stdout, "%3s %3s %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f\n", name.c_str(), prns[i].c_str(),
+                bias[i][0], bias[i][1], bias[i][2], bias[i][3], wl_bias[i], nl_bias[i]);
     }
 
     fclose(fp);

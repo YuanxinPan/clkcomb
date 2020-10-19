@@ -7,6 +7,7 @@
 #include <pppx/chrono.h>
 #include <pppx/coord.h>
 #include <pppx/rinex.h>
+#include "Satellite.h"
 
 const double None = 0.0;
 
@@ -20,7 +21,8 @@ public:
     bool read_orbit(const std::string &path);
     bool read_orbit(const std::vector<std::string> &paths);
     bool open_clock(const std::string &path);
-    bool read_bias(const std::string &path, const std::vector<std::string> &prns);
+    bool read_bias(const std::string &path, const std::vector<std::string> &prns,
+                   const std::vector<Satellite> &sats);
 
     bool read_clock(MJD t, int length, int interval,
                     const std::vector<std::string> &prns, const RinexSp3 &refsp3);
@@ -30,7 +32,8 @@ public:
 
 private:
     bool read_grg_bias(const std::string &path, const std::vector<std::string> &prns);
-    bool read_snx_bias(const std::string &path, const std::vector<std::string> &prns);
+    bool read_snx_bias(const std::string &path, const std::vector<std::string> &prns,
+                       const std::vector<Satellite> &sats);
 
 private:
     RinexSp3 rnxsp3_;

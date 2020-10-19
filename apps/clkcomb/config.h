@@ -10,18 +10,19 @@ typedef struct TAGCONFIG
 {
     // session
     MJD mjd;
-    int interval = 0;  // sample rate: 1s, 30s, etc.
-    int length = 0;    // clock 
+    int interval = 0;        // sample rate: 1s, 30s, etc.
+    int length = 0;          // time span of combination
 
     // constellation
     // int system = 0;       // sys |= 1<<GLS
-    std::string strsys;
+    std::string strsys;      // GREC, etc.
     std::vector<std::string> prns;
     std::vector<std::string> excluded_prns;
 
     // ac
-    std::string orb_ac;
     std::vector<std::string> ac_names;
+    std::string orb_ac;      // combined orbit
+    std::string weight_method;
 
     // product path
     bool phase_clock = false;

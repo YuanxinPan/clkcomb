@@ -90,8 +90,10 @@ static int handler(void* user, const char* section, const char* name, const char
         push_back(value, pconfig->excluded_prns);
     } else if (MATCH("ac", "name")) {
         push_back(value, pconfig->ac_names);
-    } else if (MATCH("ac", "combined orb")) {
+    } else if (MATCH("ac", "combined orbit")) {
         pconfig->orb_ac.assign(value);
+    } else if (MATCH("ac", "weight method")) {
+        pconfig->weight_method.assign(value);
     } else if (MATCH("product", "path")) {
         pconfig->product_path.assign(value);
     } else if (MATCH("product", "phase clock")) {
@@ -142,7 +144,10 @@ static bool check_config(const config_t &config)
         fprintf(stderr, MSG_ERR "check_config: [ac] name not set\n");
         return false;
     } else if (config.orb_ac.empty()) {
-        fprintf(stderr, MSG_ERR "check_config: [ac] combined orb not set\n");
+        fprintf(stderr, MSG_ERR "check_config: [ac] combined orbit not set\n");
+        return false;
+    } else if (config.weight_method.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [ac] weight method not set\n");
         return false;
     } else if (config.product_path.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [product] path not set\n");
@@ -162,7 +167,7 @@ static bool check_config(const config_t &config)
     } else if (config.atx_path.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [table] atx path not set\n");
         return false;
-    } else{
+    } else {
         return true;
     }
 }
@@ -235,7 +240,7 @@ void print_config(FILE *fp, const config_t &config)
     int dow = static_cast<int>(sow/86400);
 
     fprintf(fp, "[session]\n");
-    fprintf(fp, "date    : %-d %-d\n", week, dow);
+    fprintf(fp, "date    : %-d %-d (GPSWeek)\n", week, dow);
     fprintf(fp, "length  : %-d\n", config.length);
     fprintf(fp, "interval: %-d\n", config.interval);
 
@@ -248,7 +253,8 @@ void print_config(FILE *fp, const config_t &config)
     fprintf(fp, "\n[ac]\n");
     fprintf(fp, "name: ");
     print_prns(fp, config.ac_names);
-    fprintf(fp, "combined orb: %3s\n", config.orb_ac.c_str());
+    fprintf(fp, "combined orbit: %3s\n", config.orb_ac.c_str());
+    fprintf(fp, "weight method: %s\n", config.weight_method.c_str());
 
 
     fprintf(fp, "\n[product]\n");

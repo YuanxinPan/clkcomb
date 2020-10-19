@@ -14,6 +14,7 @@ public:
     std::string svn;
     double f[2];
     double waveLen[2];
+    std::string obstp[4]; // obs code in BINEX
 };
 
 #endif

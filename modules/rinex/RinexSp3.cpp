@@ -64,15 +64,14 @@ bool RinexSp3::read(const std::string &path)
             }
             sp3.t.d = date2mjd(y, m, d);
             sp3.t.sod = hms2sod(h, min, s);
-        }
-        else {
+        } else {
             int n = sscanf(buf+4, "%lf%lf%lf", &sp3.pos.x, &sp3.pos.y, &sp3.pos.z);
             if (n != 3) {
                 fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
                         "RinexSp3::read: %s", buf);
                 return false;
             }
-            if (sp3.pos.norm() < MaxWnd)
+            if (sp3.pos.norm() < MaxWnd || isnan(sp3.pos.x+sp3.pos.y+sp3.pos.z))
                 continue;
 
             prn.assign(buf+1, 3);
