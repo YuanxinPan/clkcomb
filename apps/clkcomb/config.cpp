@@ -96,6 +96,10 @@ static int handler(void* user, const char* section, const char* name, const char
         pconfig->weight_method.assign(value);
     } else if (MATCH("product", "path")) {
         pconfig->product_path.assign(value);
+    } else if (MATCH("product", "combine staclk")) {
+        std::string v(value);
+        if (v=="True" || v=="true")
+            pconfig->combine_staclk = true;
     } else if (MATCH("product", "phase clock")) {
         std::string v(value);
         if (v=="True" || v=="true")
@@ -108,9 +112,11 @@ static int handler(void* user, const char* section, const char* name, const char
         pconfig->bia_pattern.assign(value);
     } else if (MATCH("product", "sp3 pattern")) {
         pconfig->sp3_pattern.assign(value);
+    } else if (MATCH("product", "snx pattern")) {
+        pconfig->snx_pattern.assign(value);
     // } else if (MATCH("product", "erp pattern")) {
     //     pconfig->erp_pattern.assign(value);
-    } else if (MATCH("table", "igsatx")) {
+    } else if (MATCH("table", "atx")) {
         pconfig->atx_path.assign(value);
     // } else if (MATCH("table", "jpleph")) {
     //     pconfig->eph_path.assign(value);
@@ -160,6 +166,9 @@ static bool check_config(const config_t &config)
         return false;
     } else if (config.sp3_pattern.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [product] sp3 pattern not set\n");
+        return false;
+    } else if (config.combine_staclk && config.snx_pattern.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [product] snx pattern not set\n");
         return false;
     } else if (config.phase_clock && config.bia_pattern.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [product] bia pattern not set\n");
@@ -259,13 +268,16 @@ void print_config(FILE *fp, const config_t &config)
 
     fprintf(fp, "\n[product]\n");
     fprintf(fp, "path: %s\n", config.product_path.c_str());
-    std::string str = "false";
-    if (config.phase_clock) str = "true";
+    std::string str;
+    str = config.phase_clock ? "true" : "false";
     fprintf(fp, "phase clock: %s\n", str.c_str());
+    str = config.combine_staclk ? "true" : "false";
+    fprintf(fp, "combine staclk: %s\n", str.c_str());
     fprintf(fp, "nav pattern: %s\n", config.nav_pattern.c_str());
     fprintf(fp, "sp3 pattern: %s\n", config.sp3_pattern.c_str());
     fprintf(fp, "clk pattern: %s\n", config.clk_pattern.c_str());
     fprintf(fp, "bia pattern: %s\n", config.bia_pattern.c_str());
+    fprintf(fp, "snx pattern: %s\n", config.snx_pattern.c_str());
 
     fprintf(fp, "\n[table]\n");
     fprintf(fp, "atx: %s\n", config.atx_path.c_str());

@@ -11,6 +11,7 @@ typedef struct TAGCONFIG
     // session
     MJD mjd;
     int interval = 0;        // sample rate: 1s, 30s, etc.
+    int sta_interval = 300;  // sample rate for station clock
     int length = 0;          // time span of combination
 
     // constellation
@@ -19,18 +20,22 @@ typedef struct TAGCONFIG
     std::vector<std::string> prns;
     std::vector<std::string> excluded_prns;
 
+    std::vector<std::string> sta_list;
+
     // ac
     std::vector<std::string> ac_names;
     std::string orb_ac;      // combined orbit
     std::string weight_method;
 
     // product path
+    bool combine_staclk = false;
     bool phase_clock = false;
     std::string product_path;
     std::string nav_pattern; // broadcast ephemeris
     std::string clk_pattern; // satellite clock
     std::string bia_pattern; // satellite bias
     std::string sp3_pattern; // precise orbit
+    std::string snx_pattern; // SINEX
     std::string erp_pattern; // ERP file
 
     // table path

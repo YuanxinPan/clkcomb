@@ -3,37 +3,38 @@
 
 #include <pppx/const.h>
 #include <pppx/io.h>
+
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
 #include <algorithm>
 #include <array>
+#include <cctype>
 
 bool AnalyseCenter::read_orbit(const std::string &path)
 {
-    if (rnxsp3_.read(path)) {
-        return true;
-    } else {
-        return false;
-    }
+    return rnxsp3_.read(path);
 }
 
-bool AnalyseCenter::read_orbit(const std::vector<std::string> &paths)
+// bool AnalyseCenter::read_orbit(const std::vector<std::string> &paths)
+// {
+//     if (rnxsp3_.read(paths)) {
+//         return true;
+//     } else {
+//         return false;
+//     }
+// }
+
+bool AnalyseCenter::read_sinex(const std::string &path)
 {
-    if (rnxsp3_.read(paths)) {
-        return true;
-    } else {
-        return false;
-    }
+    return rnxsnx_.read(path);
 }
 
 bool AnalyseCenter::open_clock(const std::string &path)
 {
-    if (rnxclk_.read(path)) {
-        return true;
-    } else {
-        return false;
-    }
+    return rnxclk_.read(path);
 }
 
 bool AnalyseCenter::read_clock(MJD t, int length, int interval,
@@ -64,6 +65,63 @@ bool AnalyseCenter::read_clock(MJD t, int length, int interval,
     }
 
     rnxclk_.close();
+    return true;
+}
+
+bool AnalyseCenter::read_staclk(MJD t, int length, int interval,
+                                const std::vector<std::string> &sta_list,
+                                const RinexSnx &refsnx)
+{
+    const size_t nsta_total = sta_list.size();
+    const size_t nepo_total = length/interval + 1;
+
+    FILE *fp = fopen(clk_file.c_str(), "r");
+    if (fp == nullptr) {
+        fprintf(stderr, MSG_ERR "no such file: %s\n", clk_file.c_str());
+        return false;
+    }
+
+    sta_clks.clear();
+    sta_clks.resize(nsta_total);
+    for (auto it=sta_clks.begin(); it!=sta_clks.end(); ++it)
+        it->resize(nepo_total);
+
+    skip_header(fp);
+    char buf[BUFSIZ];
+    int y, m, d, h, min, n, epo;
+    double s, sod, bias;
+    std::string site;
+    CartCoor src, dst;
+    while (fgets(buf, sizeof(buf), fp))
+    {
+        if (strncmp(buf, "AR ", 3) != 0)
+            continue;
+        site.assign(buf+3, 4);
+        std::transform(site.begin(), site.end(), site.begin(),
+                        [](unsigned char c) { return std::toupper(c); });
+        if (!std::binary_search(sta_list.begin(), sta_list.end(), site))
+            continue;
+        sscanf(buf+8, "%d %d %d %d %d %lf %d %lf", &y, &m, &d, &h, &min, &s, &n, &bias);
+        if (n > 2) {
+            fprintf(stderr, MSG_ERR "RinexClk::open: n>2\n");
+            return false;
+        }
+        sod = h*3600 + min*60 + s;
+        if (fmod(sod, interval)>MaxWnd || length-sod<0)
+            continue;
+
+        auto it = std::lower_bound(sta_list.begin(), sta_list.end(), site);
+        int index = it - sta_list.begin();
+        if (!rnxsnx_.find_pos(site, src) || !refsnx.find_pos(site, dst))
+            bias = None; // 0
+        else
+            bias -= (src - dst).dot(src)/src.norm()/LightSpeed;
+
+        epo = int(sod/interval);
+        sta_clks[index][epo] = bias*1E9; // sec => ns
+    }
+
+    fclose(fp);
     return true;
 }
 

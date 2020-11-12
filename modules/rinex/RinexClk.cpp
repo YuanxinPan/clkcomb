@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cctype>
 #include <algorithm>
 #include <pppx/const.h>
 
@@ -29,12 +30,23 @@ bool RinexClk::read(const std::string &path)
     {
         if (strncmp(buf_+60, "END OF HEADER", 13) == 0)
             break;
-        else if (strncmp(buf_+60, "# OF SOLN SATS", 14) == 0) {
+        else if (strncmp(buf_+60, "# OF SOLN STA / TRF", 19) == 0) {
+            int n = atoi(buf_);
+            sta_names_.reserve(n);
+            // sta_poss_.reserve(n);
+        } else if (strncmp(buf_+60, "SOLN STA NAME / NUM", 19) == 0) {
+            std::string name(buf_, 4);
+            std::transform(name.begin(), name.end(), name.begin(),
+                           [](unsigned char c) { return std::toupper(c); });
+            sta_names_.push_back(name);
+            // double x, y, z;
+            // sscanf(buf_+14, "%lf %lf %lf", &x, &y, &z);
+            // sta_poss_.emplace_back(x/1E3, y/1E3, z/1E3);
+        } else if (strncmp(buf_+60, "# OF SOLN SATS", 14) == 0) {
             int n = atoi(buf_+3);
             ns = static_cast<size_t>(n);
             prns_.reserve(ns);
-        }
-        else if (strncmp(buf_+60, "PRN LIST", 8) == 0) {
+        } else if (strncmp(buf_+60, "PRN LIST", 8) == 0) {
             for (int i=0; i<15 && prns_.size()<ns; ++i) {
                 //if (buf[] == ' ') buf[] = '0';
                 //if (buf[] == ' ') buf[] = 'G';
@@ -43,6 +55,13 @@ bool RinexClk::read(const std::string &path)
             }
         }
     }
+
+    // printf("%s: %3lu\n", path.c_str(), sta_names_.size());
+    // for (size_t i=0, size=sta_names_.size(); i!=size; ++i) {
+    //     printf(" %4s %14.3f %14.3f %14.3f\n", sta_names_[i].c_str(), sta_poss_[i].x, sta_poss_[i].y, sta_poss_[i].z);
+    // }
+    // printf("\n");
+    // fflush(stdout);
 
     if (prns_.size() == 0u) {
         fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET

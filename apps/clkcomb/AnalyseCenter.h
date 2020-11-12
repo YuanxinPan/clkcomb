@@ -19,7 +19,8 @@ public:
     ~AnalyseCenter(){}
 
     bool read_orbit(const std::string &path);
-    bool read_orbit(const std::vector<std::string> &paths);
+    bool read_sinex(const std::string &path);
+    // bool read_orbit(const std::vector<std::string> &paths);
     bool open_clock(const std::string &path);
     bool read_bias(const std::string &path, const std::vector<std::string> &prns,
                    const std::vector<Satellite> &sats);
@@ -28,7 +29,12 @@ public:
                     const std::vector<std::string> &prns, const RinexSp3 &refsp3);
 
     const RinexSp3 &rnxsp3()const { return rnxsp3_; }
-    // void close() { rnxclk_.close(); }
+    const RinexSnx &rnxsnx()const { return rnxsnx_; }
+
+    const std::vector<std::string> &sta_names() { return rnxclk_.sta_names(); }
+
+    bool read_staclk(MJD t, int length, int interval,
+                     const std::vector<std::string> &sta_list, const RinexSnx &refsnx);
 
 private:
     bool read_grg_bias(const std::string &path, const std::vector<std::string> &prns);
@@ -36,16 +42,19 @@ private:
                        const std::vector<Satellite> &sats);
 
 private:
-    RinexSp3 rnxsp3_;
     RinexClk rnxclk_;
+    RinexSnx rnxsnx_;
+    RinexSp3 rnxsp3_;
 
 public:
     std::string name;
-    std::string sp3_file;
     std::string clk_file;
     std::string bia_file;
+    std::string snx_file;
+    std::string sp3_file;
 
-    std::vector<std::vector<double>> sat_clks; //  clk of all satellites for all epoches
+    std::vector<std::vector<double>> sta_clks; // clk of all stations for all epoches
+    std::vector<std::vector<double>> sat_clks; // clk of all satellites for all epoches
     std::vector<int>    have_bias;
     std::vector<double> wl_bias;
     std::vector<double> nl_bias;

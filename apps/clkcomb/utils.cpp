@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <algorithm>
+#include <map>
 #include <math.h>
 #include <numeric>
 #include <pppx/io.h>
@@ -43,7 +45,7 @@ std::string replace_pattern(const std::string &pattern, MJD t,
     return file_name;
 }
 
-bool init_acs(const config_t &config, const std::vector<Satellite> &sats,
+bool init_acs(config_t &config, const std::vector<Satellite> &sats,
               std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac)
 {
     for (auto it=config.ac_names.begin(); it!=config.ac_names.end(); ++it) {
@@ -56,25 +58,57 @@ bool init_acs(const config_t &config, const std::vector<Satellite> &sats,
         //     t.d += (i-1);
         //     sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, *it));
         // }
-        ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
-        ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
         ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, *it);
+        ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
+        ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
+        ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
         if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file)
+            || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
             || (config.phase_clock && !ac.read_bias(ac.bia_file, config.prns, sats))) {
             acs.pop_back();
             fprintf(stderr, MSG_WAR "remove AC without products: %s\n", it->c_str());
         }
     }
 
-    combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
-    combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
+    if (config.combine_staclk) {
+        std::map<std::string, int> sta_counts;
+        for (auto it=acs.begin(); it!=acs.end(); ++it)
+        {
+            auto sta_names = it->sta_names();
+            for (auto name=sta_names.begin(); name!=sta_names.end(); ++name)
+            {
+                ++sta_counts[*name];
+            }
+        }
+        for (auto it=sta_counts.begin(); it!=sta_counts.end(); ++it)
+        {
+            if (it->second < 3)
+                continue;
+            config.sta_list.push_back(it->first);
+        }
+        std::sort(config.sta_list.begin(), config.sta_list.end());
+
+        printf("COMMON STATION: %3lu\n", config.sta_list.size());
+        for (size_t i=0; i!=config.sta_list.size(); ++i)
+        {
+            if (i!=0 && i%10 == 0) printf("\n");
+            printf("%4s ", config.sta_list[i].c_str());
+        }
+        printf("\n\n");
+    }
+
     combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
-    // if (!combined_ac.read_orbit(combined_ac.sp3_file) || !combined_ac.open_clock(combined_ac.clk_file)) {
-    if (!combined_ac.read_orbit(combined_ac.sp3_file)) {
+    combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
+    combined_ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined_ac.name);
+    combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
+    if (!combined_ac.read_orbit(combined_ac.sp3_file) || !combined_ac.open_clock(combined_ac.clk_file) ||
+        (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
         fprintf(stderr, MSG_ERR "no combined sp3 file: %s\n", combined_ac.sp3_file.c_str());
         return false;
     }
     // combined_ac.read_clock(config.mjd, config.length, config.interval, config.prns, combined_ac.rnxsp3());
+    // if (config.combine_staclk)
+    //     combined_ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
 
     // Check whether we have enough ACs
     if (acs.size() < 3u) {
@@ -240,6 +274,36 @@ bool construct_initclk(const config_t &config,
             printf("null %3s %3s\n", sats[*it].prn.c_str(), acs[index].name.c_str());
         }
     }
+    return true;
+}
+
+bool construct_init_staclk(const config_t &config,
+                           const std::vector<AnalyseCenter> &acs,
+                           std::vector<std::vector<double>> &comb_clks)
+{
+    // size_t nac_total  = acs.size();
+    size_t nsta_total = config.sta_list.size();
+    size_t nepo_total = acs[0].sta_clks[0].size();
+
+    comb_clks.clear();
+    comb_clks.resize(nsta_total);
+    for (size_t ista=0; ista!=nsta_total; ++ista)
+    {
+        for (size_t iepo=0; iepo!=nepo_total; ++iepo)
+        {
+            std::vector<double> clks;
+            for (auto it=acs.begin(); it!=acs.end(); ++it)
+            {
+                if (it->sta_clks[ista][iepo] != None)
+                    clks.push_back(it->sta_clks[ista][iepo]);
+            }
+            if (clks.size() < 3)
+                comb_clks[ista].push_back(None);
+            else
+                comb_clks[ista].push_back(median(clks));
+        }
+    }
+
     return true;
 }
 
@@ -743,6 +807,37 @@ void compare_satclks(const config_t &config, const std::string &name,
     }
 }
 
+void compare_staclks(const config_t &config, const std::string &name,
+                     const std::vector<std::vector<double>> &src_clks,
+                     const std::vector<std::vector<double>> &ref_clks,
+                     bool epoch_output)
+{
+    const size_t nsta_total = config.sta_list.size();
+
+    for (size_t ista=0; ista!=nsta_total; ++ista) {
+        int epo = 0;
+        std::vector<double> diffs;
+        for (auto it=src_clks[ista].cbegin(), ref=ref_clks[ista].cbegin(); it!=src_clks[ista].cend(); ++ref, ++it, ++epo) {
+            if (*it==None || *ref==None)
+                continue;
+            double diff = *it - *ref;
+            diffs.push_back(diff);
+            if (epoch_output)
+                fprintf(stdout, "%4d %4s com-igs %8.3f\n", epo, config.sta_list[ista].c_str(), 1E3*diff);
+        }
+
+        int count = diffs.size();
+        if (count == 0)
+            continue;
+        double bias = std::accumulate(diffs.begin(), diffs.end(), 0.)/count;
+        double sum = 0;
+        for (auto it=diffs.cbegin(); it!=diffs.cend(); ++it)
+            sum += pow(*it-bias, 2);
+        double std = sqrt(sum/count);
+        fprintf(stdout, "%3s %4s %4d %8.3f %8.3f\n", name.c_str(), config.sta_list[ista].c_str(), count, 1E3*bias, 1E3*std);
+    }
+}
+
 void write_satclks(FILE *fp, const config_t &config, const std::string &acn,
                    const std::vector<std::vector<double>> &sat_clks)
 {
@@ -774,9 +869,9 @@ void write_satclks_diff(FILE *fp, const config_t &config, const std::string &acn
     fflush(fp);
 }
 
-bool write_clkfile(const std::string &path, MJD t, int length, int interval,
-                   const std::vector<std::string> &prns,
-                   const std::vector<std::vector<double>> &satclks)
+bool write_clkfile(const std::string &path, const config_t &config,
+                   const std::vector<std::vector<double>> &satclks,
+                   const std::vector<std::vector<double>> &staclks)
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
@@ -784,8 +879,19 @@ bool write_clkfile(const std::string &path, MJD t, int length, int interval,
         return false;
     }
 
+    MJD t = config.mjd;
+    int interval = config.interval;
+    int interval_sta = config.sta_interval;
+    const std::vector<std::string> &prns = config.prns;
+    const std::vector<std::string> &site_list = config.sta_list;
+
     size_t nsat = prns.size();
-    size_t nepo = length/interval + 1;
+    size_t nsta = site_list.size();
+    size_t nepo = satclks[0].size();
+    size_t nepo_sta = 0;
+    if (config.combine_staclk)
+        nepo_sta = staclks[0].size();
+    size_t ratio = interval_sta/interval;
 
     // collect valid prns with clk
     std::vector<std::string> valid_prns;
@@ -794,6 +900,19 @@ bool write_clkfile(const std::string &path, MJD t, int length, int interval,
             if (satclks[i][j] != None) {
                 valid_prns.push_back(prns[i]);
                 break;
+            }
+        }
+    }
+
+    // collect valid sites with clk
+    std::vector<std::string> valid_sites;
+    if (config.combine_staclk) {
+        for (size_t i=0; i!=nsta; ++i) {
+            for (size_t j=0; j!=nepo_sta; ++j) {
+                if (staclks[i][j] != None) {
+                    valid_sites.push_back(site_list[i]);
+                    break;
+                }
             }
         }
     }
@@ -813,6 +932,14 @@ bool write_clkfile(const std::string &path, MJD t, int length, int interval,
     // write header
     fprintf(fp, "     2.00           CLOCK DATA                              RINEX VERSION / TYPE\n");
     fprintf(fp, "    %2d                                                      LEAP SECONDS        \n", leap_sec);
+
+    if (config.combine_staclk) {
+        fprintf(fp, "   %3lu %73s\n", valid_sites.size(), "# OF SOLN STA / TRF ");
+        for (size_t i=0; i!=valid_sites.size(); ++i) {
+            fprintf(fp, "%4s %76s\n", valid_sites[i].c_str(), "SOLN STA NAME / NUM");
+        }
+    }
+
     fprintf(fp, "   %3lu %73s\n", valid_prns.size(), "# OF SOLN SATS      ");
     size_t n = (valid_prns.size()+14)/15*15;
     for (size_t i=0; i!=n; ++i) {
@@ -830,6 +957,16 @@ bool write_clkfile(const std::string &path, MJD t, int length, int interval,
     double s;
     for (size_t i=0; i!=nepo; ++i) {
         mjd2date(t.d, interval*i, &y, &m, &d, &h, &min, &s);
+
+        if (config.combine_staclk && i%ratio == 0) {
+            for (size_t j=0; j!=nsta; ++j) {
+                if (staclks[j][i] == None)
+                    continue;
+                fprintf(fp, "AR %4s %4d %02d %02d %02d %02d %9.6f  1 %21.12E\n",
+                        site_list[j].c_str(), y, m, d, h, min, s, staclks[j][i]);
+            }
+        }
+
         for (size_t j=0; j!=nsat; ++j) {
             if (satclks[j][i] == None)
                 continue;

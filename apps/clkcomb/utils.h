@@ -13,7 +13,7 @@ std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix=std::string(),
                             const std::string &suffix=std::string());
 
-bool init_acs(const config_t &config, const std::vector<Satellite> &sats,
+bool init_acs(config_t &config, const std::vector<Satellite> &sats,
               std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac);
 
 bool init_sats(const config_t &config, std::vector<Satellite> &sats);
@@ -22,6 +22,10 @@ bool construct_initclk(const config_t &config,
                        const std::vector<AnalyseCenter> &acs,
                        const std::vector<Satellite> &sats,
                        std::vector<std::vector<double>> &comb_clks);
+
+bool construct_init_staclk(const config_t &config,
+                           const std::vector<AnalyseCenter> &acs,
+                           std::vector<std::vector<double>> &comb_clks);
 
 bool align_widelane(const std::vector<Satellite> &sats,
                     std::vector<AnalyseCenter> &acs,
@@ -67,9 +71,14 @@ void compare_satclks(const config_t &config, const std::string &name,
                      const std::vector<std::vector<double>> &ref_clks,
                      bool epoch_output);
 
-bool write_clkfile(const std::string &path, MJD t, int length, int interval,
-                   const std::vector<std::string> &prns,
-                   const std::vector<std::vector<double>> &satclks);
+void compare_staclks(const config_t &config, const std::string &name,
+                     const std::vector<std::vector<double>> &sat_clks,
+                     const std::vector<std::vector<double>> &ref_clks,
+                     bool epoch_output);
+
+bool write_clkfile(const std::string &path, const config_t &config,
+                   const std::vector<std::vector<double>> &satclks,
+                   const std::vector<std::vector<double>> &staclks);
 
 bool write_bias(const std::string &path, MJD t,
                 const std::vector<Satellite> &sats,
