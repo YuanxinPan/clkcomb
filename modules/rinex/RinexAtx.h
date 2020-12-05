@@ -16,8 +16,10 @@ public:
     private:
         friend class RinexAtx;
         std::string name;
-        std::string svn;
+        std::string svn_;
+        std::string svType_;
         int nfreq;
+        std::vector<std::string> freq;
         std::vector<std::array<double,3>> pcos;  // nfreq
         double dazi;
         double dzen, zen1, zen2;
@@ -25,10 +27,11 @@ public:
         mutable double R_[9];    // rotation matrix: spacecraft to ecef
 
     public:
-        void pco(double *pco)const;
-        void pco(const double *xsat, const double *vsat, const double *xsun, double *pco)const;
+        void pco(double *pco, const std::string &f1, const std::string &f2)const;
+        void pco(const double *xsat, const double *vsat, const double *xsun, double *pco, double *R=nullptr)const;
         double pcv(double zen, double azi)const;
-        inline const std::string &SVN()const { return svn; }
+        inline const std::string &svn()const { return svn_; }
+        inline const std::string &svType()const { return svType_; }
         inline const double *R()const { return R_; }
         inline friend bool operator==(const atx_t &atx, const std::string &ant) {
             return atx.name == ant;
@@ -65,15 +68,16 @@ public:
     };
 #endif
 
-private:
-    RinexAtx(const RinexAtx &);
-    RinexAtx &operator=(const RinexAtx &);
+// private:
+//     RinexAtx(const RinexAtx &);
+//     RinexAtx &operator=(const RinexAtx &);
 
 public:
     RinexAtx(): atxFile_(nullptr) {}
-    ~RinexAtx();
+    ~RinexAtx(){}
 
     bool open(const std::string &path);
+    void close();
     const atx_t *atx(MJD t, const std::string &ant);
 
 private:

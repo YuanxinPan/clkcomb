@@ -116,8 +116,8 @@ static int handler(void* user, const char* section, const char* name, const char
         pconfig->snx_pattern.assign(value);
     // } else if (MATCH("product", "erp pattern")) {
     //     pconfig->erp_pattern.assign(value);
-    } else if (MATCH("table", "atx")) {
-        pconfig->atx_path.assign(value);
+    } else if (MATCH("table", "atx pattern")) {
+        pconfig->atx_pattern.assign(value);
     // } else if (MATCH("table", "jpleph")) {
     //     pconfig->eph_path.assign(value);
     // } else if (MATCH("table", "leapsec")) {
@@ -173,8 +173,8 @@ static bool check_config(const config_t &config)
     } else if (config.phase_clock && config.bia_pattern.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [product] bia pattern not set\n");
         return false;
-    } else if (config.atx_path.empty()) {
-        fprintf(stderr, MSG_ERR "check_config: [table] atx path not set\n");
+    } else if (config.atx_pattern.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [table] atx pattern not set\n");
         return false;
     } else {
         return true;
@@ -280,7 +280,7 @@ void print_config(FILE *fp, const config_t &config)
     fprintf(fp, "snx pattern: %s\n", config.snx_pattern.c_str());
 
     fprintf(fp, "\n[table]\n");
-    fprintf(fp, "atx: %s\n", config.atx_path.c_str());
+    fprintf(fp, "atx: %s\n", config.atx_pattern.c_str());
     // fprintf(fp, "eph: %s\n", config.eph_path.c_str());
     // fprintf(fp, "lps: %s\n", config.lps_path.c_str());
 

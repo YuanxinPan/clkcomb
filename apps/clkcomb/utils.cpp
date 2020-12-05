@@ -58,11 +58,12 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         //     t.d += (i-1);
         //     sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, *it));
         // }
+        ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, *it);
         ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, *it);
         ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
         ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
         ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
-        if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file)
+        if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
             || (config.phase_clock && !ac.read_bias(ac.bia_file, config.prns, sats))) {
             acs.pop_back();
@@ -97,11 +98,14 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         printf("\n\n");
     }
 
+    combined_ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined_ac.name);
     combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
     combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
     combined_ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined_ac.name);
     combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
-    if (!combined_ac.read_orbit(combined_ac.sp3_file) || !combined_ac.open_clock(combined_ac.clk_file) ||
+    if (!combined_ac.read_orbit(combined_ac.sp3_file) ||
+        !combined_ac.open_clock(combined_ac.clk_file) ||
+        !combined_ac.open_atx(combined_ac.atx_file) ||
         (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
         fprintf(stderr, MSG_ERR "no combined sp3 file: %s\n", combined_ac.sp3_file.c_str());
         return false;
@@ -179,13 +183,13 @@ bool sat_obstp(const std::string &prn, std::string obstp[])
 
 bool init_sats(const config_t &config, std::vector<Satellite> &sats)
 {
-    RinexAtx rnxatx;
-    if (!rnxatx.open(config.atx_path))
-        return false;
+    // RinexAtx rnxatx;
+    // if (!rnxatx.open(config.atx_path))
+    //     return false;
 
     MJD t = config.mjd;
     t.sod = 43200;
-    const RinexAtx::atx_t *atx = nullptr;
+    // const RinexAtx::atx_t *atx = nullptr;
 
     sats.clear();
     for (auto it=config.prns.begin(); it!=config.prns.end(); ++it) {
@@ -200,12 +204,12 @@ bool init_sats(const config_t &config, std::vector<Satellite> &sats)
         if (config.phase_clock && !sat_obstp(*it, sat.obstp))
             return false;
 
-        atx = rnxatx.atx(t, sat.prn);
-        if (nullptr != atx) {
-            sat.svn = atx->SVN();
-        } else {
-            fprintf(stderr, MSG_WAR "init_sats: no SVN for %3s\n", sat.prn.c_str());
-        }
+        // atx = rnxatx.atx(t, sat.prn);
+        // if (nullptr != atx) {
+            // sat.svn = atx->svn();
+        // } else {
+            // fprintf(stderr, MSG_WAR "init_sats: no SVN for %3s\n", sat.prn.c_str());
+        // }
     }
     return true;
 }
@@ -358,7 +362,8 @@ bool align_widelane(const std::vector<Satellite> &sats,
     // 1. coarse alignment
     for (auto it=acs.begin(); it!=acs.end(); ++it) {
         double d = acs[0].wl_bias[refsat] - it->wl_bias[refsat];
-        diff[it-acs.begin()].assign(nsat, d);
+        // diff[it-acs.begin()].assign(nsat, d);
+        diff[it-acs.begin()].assign(nsat, .0);
         for (auto i=prns.begin(); i!=prns.end(); ++i)
             if (it->have_bias[*i])
                 it->wl_bias[*i] += d;
@@ -382,8 +387,8 @@ bool align_widelane(const std::vector<Satellite> &sats,
         // check for WL cluster at two ends
         bool pos = false, neg = false;
         for (size_t j=0; j!=nac; ++j) {
-            if (acs[j].wl_bias[*i] >  0.45) pos=true;
-            if (acs[j].wl_bias[*i] < -0.45) neg=true;
+            if (acs[j].wl_bias[*i] >  0.4) pos=true;
+            if (acs[j].wl_bias[*i] < -0.4) neg=true;
         }
         if (pos && neg) {
             for (size_t j=0; j!=nac; ++j) {
@@ -428,7 +433,7 @@ bool align_widelane(const std::vector<Satellite> &sats,
                 continue;
             double d = mean - acs[j].wl_bias[*i];
             acs[j].wl_bias[*i] += d;
-            diff[j][i-prns.begin()] += d;
+            // diff[j][i-prns.begin()] += d;
         }
     }
 
@@ -687,6 +692,7 @@ void remove_clock_bias(const std::string &name, const Satellite &sat,
     sum -= pow(bias, 2)*deleted.size();
     std = sqrt(sum/count);
 
+    double mean = bias;
     if (phase_clock) {
         double waveNL = 1E9/(sat.f[0] + sat.f[1]); // ns
         bias = floor(bias/waveNL + 0.5)*waveNL;
@@ -700,7 +706,8 @@ void remove_clock_bias(const std::string &name, const Satellite &sat,
         std += 20*1E-3;
     }
 
-    fprintf(stdout, "bias:  %4d/%4d %8.3f %8.3f\n", count, epo_sum, 1E3*bias, 1E3*std);
+    double res_cycle = (mean-bias)/1E9*(sat.f[0]+sat.f[1]);
+    fprintf(stdout, "bias:  %4d/%4d %8.3f %8.3f %8.3f\n", count, epo_sum, 1E3*bias, res_cycle, 1E3*std);
 
     // Debug
     if (!deleted.empty()) {

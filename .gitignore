@@ -10,3 +10,4 @@ clkcomb
 !apps/clkcomb
 apps/comclk
 apps/backup
+table/*.atx

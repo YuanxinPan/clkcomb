@@ -21,13 +21,15 @@ public:
     bool read_orbit(const std::string &path);
     bool read_sinex(const std::string &path);
     // bool read_orbit(const std::vector<std::string> &paths);
+    bool open_atx(const std::string &path);
     bool open_clock(const std::string &path);
     bool read_bias(const std::string &path, const std::vector<std::string> &prns,
                    const std::vector<Satellite> &sats);
 
     bool read_clock(MJD t, int length, int interval,
-                    const std::vector<std::string> &prns, const RinexSp3 &refsp3);
+                    const std::vector<std::string> &prns, const RinexSp3 &refsp3, RinexAtx &refatx);
 
+    RinexAtx &rnxatx() { return rnxatx_; }
     const RinexSp3 &rnxsp3()const { return rnxsp3_; }
     const RinexSnx &rnxsnx()const { return rnxsnx_; }
 
@@ -42,12 +44,14 @@ private:
                        const std::vector<Satellite> &sats);
 
 private:
+    RinexAtx rnxatx_;
     RinexClk rnxclk_;
     RinexSnx rnxsnx_;
     RinexSp3 rnxsp3_;
 
 public:
     std::string name;
+    std::string atx_file;
     std::string clk_file;
     std::string bia_file;
     std::string snx_file;

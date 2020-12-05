@@ -10,9 +10,10 @@
 
 void RinexClk::close()
 {
-    if (clkFile_ != nullptr)
+    if (clkFile_ != nullptr) {
         fclose(clkFile_);
-    clkFile_ = nullptr;
+        clkFile_ = nullptr;
+    }
 }
 
 bool RinexClk::read(const std::string &path)

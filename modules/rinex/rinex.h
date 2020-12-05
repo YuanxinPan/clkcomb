@@ -2,6 +2,7 @@
 #define _RINEX_H_
 
 #include "RinexAtx.h"
+#include "RinexAtt.h"
 #include "RinexClk.h"
 #include "RinexNav.h"
 #include "RinexSnx.h"

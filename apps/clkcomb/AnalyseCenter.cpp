@@ -32,13 +32,18 @@ bool AnalyseCenter::read_sinex(const std::string &path)
     return rnxsnx_.read(path);
 }
 
+bool AnalyseCenter::open_atx(const std::string &path)
+{
+    return rnxatx_.open(path);
+}
+
 bool AnalyseCenter::open_clock(const std::string &path)
 {
     return rnxclk_.read(path);
 }
 
 bool AnalyseCenter::read_clock(MJD t, int length, int interval,
-                               const std::vector<std::string> &prns, const RinexSp3 &refsp3)
+                               const std::vector<std::string> &prns, const RinexSp3 &refsp3, RinexAtx &refatx)
 {
     const size_t nsat_total = prns.size();
     const size_t nepo_total = length/interval + 1;
@@ -47,17 +52,39 @@ bool AnalyseCenter::read_clock(MJD t, int length, int interval,
     sat_clks.resize(nsat_total);
 
     double clk, corr;
+    const RinexAtx::atx_t *atx_src = nullptr;
+    const RinexAtx::atx_t *atx_dst = nullptr;
+    double psrc[3], pdst[3];
+    std::string f1, f2;
     CartCoor pos, ref;
     for (size_t epo=0; epo!=nepo_total; ++epo, t+=interval) {
         for (size_t isat=0; isat!=nsat_total; ++isat) {
             if (!rnxclk_.clkBias(t, prns[isat], clk))
                 clk = None;
+            atx_src = rnxatx_.atx(t, prns[isat]);
+            atx_dst = refatx.atx(t, prns[isat]);
+            if (atx_src == nullptr || atx_dst == nullptr)
+                clk = None;
+            else {
+                if (prns[isat][0] == 'G') {
+                    f1 = "G01"; f2 = "G02";
+                } else if (prns[isat][0] == 'E') {
+                    f1 = "E01"; f2 = "E05";
+                } else if (prns[isat][0] == 'R') {
+                    f1 = "R01"; f2 = "R02";
+                } else if (prns[isat][0] == 'C') {
+                    f1 = "C01"; f2 = "C07";
+                }
+                atx_src->pco(psrc, f1, f2);
+                atx_dst->pco(pdst, f1, f2);
+            }
             if (!rnxsp3_.satPos(t, prns[isat], pos) ||
                 !refsp3.satPos( t, prns[isat], ref)) {
                 clk = None;
             } else if (clk != None) {
                 corr = (pos - ref).dot(pos)/pos.norm();
                 clk -= corr/LightSpeed;
+                clk += (psrc[2] - pdst[2])/LightSpeed;
             }
 
             sat_clks[isat].push_back(clk*1E9); // sec => ns
@@ -65,6 +92,7 @@ bool AnalyseCenter::read_clock(MJD t, int length, int interval,
     }
 
     rnxclk_.close();
+    rnxatx_.close();
     return true;
 }
 
@@ -169,6 +197,8 @@ bool AnalyseCenter::read_grg_bias(const std::string &path, const std::vector<std
         index =  it - prns.begin();
         have_bias[index] = 1;
         wl_bias[index] = -val; // cycle
+
+        fprintf(stdout, "%3s %3s %8.3f\n", name.c_str(), prns[index].c_str(), wl_bias[index]);
     }
 
     fclose(fp);

@@ -9,17 +9,75 @@
 #include <Eigen/Dense>
 #include <pppx/const.h>
 
-void RinexAtx::atx_t::pco(double *pco)const
+void RinexAtx::atx_t::pco(double *pco, const std::string &f1, const std::string &f2)const
 {
-    pco[0] = IF_coef1*pcos[0][0] + IF_coef2*pcos[1][0];
-    pco[1] = IF_coef1*pcos[0][1] + IF_coef2*pcos[1][1];
-    pco[2] = IF_coef1*pcos[0][2] + IF_coef2*pcos[1][2];
+    double f[2] = { 0, 0 };
+    // if (name.size() == 20u) {
+    //     f[0] = GPS_f1; f[1] = GPS_f2;
+    // } else if (name[0] == 'E') {
+    //     f[0] = GAL_f1; f[1] = GAL_f5;
+    // } else if (name[0] == 'R') {
+    //     f[0] = GLS_f1; f[1] = GLS_f2;
+    // } else if (name[0] == 'C') {
+    //     f[0] = BDS_f1; f[1] = BDS_f2;
+    // } else { // G J
+    //     f[0] = GPS_f1; f[1] = GPS_f2;
+    // }
+    switch (f1[0])
+    {
+    case 'E':
+        f[0] = GAL_f1; f[1] = GAL_f5;
+        break;
+    case 'R':
+        f[0] = GLS_f1; f[1] = GLS_f2;
+        break;
+    case 'C':
+        f[0] = BDS_f1; f[1] = BDS_f2;
+        break;
+    case 'G':
+    case 'J':
+    default:
+        f[0] = GPS_f1; f[1] = GPS_f2;
+        break;
+    }
+
+    double tmp = f[0]*f[0] - f[1]*f[1];
+    double coef[2] = { f[0]*f[0]/tmp, -f[1]*f[1]/tmp };
+
+    int i=0, j=0;
+    auto it = std::find(freq.begin(), freq.end(), f1);
+    i = it - freq.begin();
+    it = std::find(freq.begin(), freq.end(), f2);
+    j = it - freq.begin();
+
+    // fprintf(stderr, "%3s %3s:%2d %3s:%2d\n", name.c_str(), f1.c_str(), i, f2.c_str(), j);
+
+    pco[0] = coef[0]*pcos[i][0] + coef[1]*pcos[j][0];
+    pco[1] = coef[0]*pcos[i][1] + coef[1]*pcos[j][1];
+    pco[2] = coef[0]*pcos[i][2] + coef[1]*pcos[j][2];
 }
 
 void RinexAtx::atx_t::pco(const double *xsat, const double *vsat,
-                          const double *xsun, double *pco)const
+                          const double *xsun, double *pco, double *R)const
 {
     Eigen::Matrix3d _R;
+    if (R != nullptr) {
+        // copy rotation matrix
+        memcpy(_R.data(), R, sizeof(double)*9); // dst src byte
+        memcpy(R_, R, sizeof(double)*9);
+
+        Eigen::Vector3d antpco;
+        antpco[0] = IF_coef1*pcos[0][0] + IF_coef2*pcos[1][0];
+        antpco[1] = IF_coef1*pcos[0][1] + IF_coef2*pcos[1][1];
+        antpco[2] = IF_coef1*pcos[0][2] + IF_coef2*pcos[1][2];
+
+        Eigen::Vector3d val = _R*antpco;
+        pco[0] = val[0];
+        pco[1] = val[1];
+        pco[2] = val[2];
+        return;
+    }
+
     double *xscf = _R.data();
     double *yscf = xscf+3;
     double *zscf = xscf+6;
@@ -111,10 +169,11 @@ double RinexAtx::atx_t::pcv(double zen, double azi)const
 }
 
 
-RinexAtx::~RinexAtx()
+void RinexAtx::close()
 {
     if (atxFile_ != nullptr) {
         fclose(atxFile_);
+        atxFile_ = nullptr;
     }
 }
 
@@ -198,7 +257,8 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)
             if (atx.name != ant)
                 skip_atx(atxFile_);
             else if (issatatx)
-                atx.svn.assign(buf+40, 4);
+                atx.svn_.assign(buf+40, 4);
+                atx.svType_.assign(buf, 12);
         }
         else if (strncmp(buf+60, "DAZI", 4) == 0)
             sscanf(buf, "%lf", &atx.dazi);
@@ -234,6 +294,7 @@ void RinexAtx::read_atx(FILE *fp, atx_t &atx)
     int nzen = static_cast<int>((atx.zen2-atx.zen1)/atx.dzen) + 1;
     int nazi = atx.dazi==0.0 ? 1 : static_cast<int>(360.0/atx.dazi) + 2;  // NOAZI
 
+    atx.freq.reserve(atx.nfreq);
     atx.pcos.reserve(atx.nfreq);
     atx.pcvs.reserve(atx.nfreq);
 
@@ -247,6 +308,7 @@ void RinexAtx::read_atx(FILE *fp, atx_t &atx)
     while (fgets(buf, sizeof(buf), fp))
     {
         if (strncmp(buf+60, "START OF FREQUENCY", 18) == 0) {
+            atx.freq.emplace_back(buf+3, 3);
             table.clear();
         }
         else if (strncmp(buf+60, "NORTH / EAST / UP", 17) == 0) {
