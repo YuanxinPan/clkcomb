@@ -104,19 +104,25 @@ static int handler(void* user, const char* section, const char* name, const char
         std::string v(value);
         if (v=="True" || v=="true")
             pconfig->phase_clock = true;
+    } else if (MATCH("product", "use att")) {
+        std::string v(value);
+        if (v=="True" || v=="true")
+            pconfig->use_att = true;
     } else if (MATCH("product", "nav pattern")) {
         pconfig->nav_pattern.assign(value);
-    } else if (MATCH("product", "clk pattern")) {
-        pconfig->clk_pattern.assign(value);
+    } else if (MATCH("product", "att pattern")) {
+        pconfig->att_pattern.assign(value);
     } else if (MATCH("product", "bia pattern")) {
         pconfig->bia_pattern.assign(value);
+    } else if (MATCH("product", "clk pattern")) {
+        pconfig->clk_pattern.assign(value);
     } else if (MATCH("product", "sp3 pattern")) {
         pconfig->sp3_pattern.assign(value);
     } else if (MATCH("product", "snx pattern")) {
         pconfig->snx_pattern.assign(value);
     // } else if (MATCH("product", "erp pattern")) {
     //     pconfig->erp_pattern.assign(value);
-    } else if (MATCH("table", "atx pattern")) {
+    } else if (MATCH("table", "atx")) {
         pconfig->atx_pattern.assign(value);
     // } else if (MATCH("table", "jpleph")) {
     //     pconfig->eph_path.assign(value);
@@ -172,6 +178,9 @@ static bool check_config(const config_t &config)
         return false;
     } else if (config.phase_clock && config.bia_pattern.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [product] bia pattern not set\n");
+        return false;
+    } else if (config.use_att && config.att_pattern.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [product] att pattern not set\n");
         return false;
     } else if (config.atx_pattern.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [table] atx pattern not set\n");
@@ -273,11 +282,14 @@ void print_config(FILE *fp, const config_t &config)
     fprintf(fp, "phase clock: %s\n", str.c_str());
     str = config.combine_staclk ? "true" : "false";
     fprintf(fp, "combine staclk: %s\n", str.c_str());
+    str = config.use_att ? "true" : "false";
+    fprintf(fp, "use att: %s\n", str.c_str());
     fprintf(fp, "nav pattern: %s\n", config.nav_pattern.c_str());
-    fprintf(fp, "sp3 pattern: %s\n", config.sp3_pattern.c_str());
-    fprintf(fp, "clk pattern: %s\n", config.clk_pattern.c_str());
+    fprintf(fp, "att pattern: %s\n", config.att_pattern.c_str());
     fprintf(fp, "bia pattern: %s\n", config.bia_pattern.c_str());
+    fprintf(fp, "clk pattern: %s\n", config.clk_pattern.c_str());
     fprintf(fp, "snx pattern: %s\n", config.snx_pattern.c_str());
+    fprintf(fp, "sp3 pattern: %s\n", config.sp3_pattern.c_str());
 
     fprintf(fp, "\n[table]\n");
     fprintf(fp, "atx: %s\n", config.atx_pattern.c_str());

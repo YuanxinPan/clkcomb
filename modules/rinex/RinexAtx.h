@@ -78,21 +78,21 @@ public:
 
     bool open(const std::string &path);
     void close();
-    const atx_t *atx(MJD t, const std::string &ant);
+    const atx_t *atx(MJD t, const std::string &ant)const;
 
 private:
     // find require ant in atxFile_
-    bool find_atx(MJD t, const std::string &ant, atx_t &atx);
+    bool find_atx(MJD t, const std::string &ant, atx_t &atx)const;
 
     // read the found atx in atxFile_
-    void read_atx(FILE *fp, atx_t &atx);
+    void read_atx(FILE *fp, atx_t &atx)const;
 
     // skip current atx
-    void skip_atx(FILE *fp);
+    void skip_atx(FILE *fp)const;
 
 private:
     FILE *atxFile_;
-    std::vector<atx_t> atxs_;
+    mutable std::vector<atx_t> atxs_;
 };
 
 #endif

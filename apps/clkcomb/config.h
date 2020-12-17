@@ -30,10 +30,12 @@ typedef struct TAGCONFIG
     // product path
     bool combine_staclk = false;
     bool phase_clock = false;
+    bool use_att = false;
     std::string product_path;
     std::string nav_pattern; // broadcast ephemeris
-    std::string clk_pattern; // satellite clock
+    std::string att_pattern; // satellite attitude
     std::string bia_pattern; // satellite bias
+    std::string clk_pattern; // satellite clock
     std::string sp3_pattern; // precise orbit
     std::string snx_pattern; // SINEX
     std::string erp_pattern; // ERP file

@@ -8,6 +8,7 @@
 #include <pppx/coord.h>
 #include <pppx/rinex.h>
 #include "Satellite.h"
+#include "config.h"
 
 const double None = 0.0;
 
@@ -19,6 +20,7 @@ public:
     ~AnalyseCenter(){}
 
     bool read_orbit(const std::string &path);
+    bool read_att(const std::string &path);
     bool read_sinex(const std::string &path);
     // bool read_orbit(const std::vector<std::string> &paths);
     bool open_atx(const std::string &path);
@@ -26,10 +28,11 @@ public:
     bool read_bias(const std::string &path, const std::vector<std::string> &prns,
                    const std::vector<Satellite> &sats);
 
-    bool read_clock(MJD t, int length, int interval,
-                    const std::vector<std::string> &prns, const RinexSp3 &refsp3, RinexAtx &refatx);
+    bool read_clock(const config_t &config, const RinexSp3 &refsp3,
+                    const RinexAtx &refatx, const RinexAtt &refatt);
 
-    RinexAtx &rnxatx() { return rnxatx_; }
+    const RinexAtt &rnxatt() { return rnxatt_; }
+    const RinexAtx &rnxatx() { return rnxatx_; }
     const RinexSp3 &rnxsp3()const { return rnxsp3_; }
     const RinexSnx &rnxsnx()const { return rnxsnx_; }
 
@@ -42,8 +45,11 @@ private:
     bool read_grg_bias(const std::string &path, const std::vector<std::string> &prns);
     bool read_snx_bias(const std::string &path, const std::vector<std::string> &prns,
                        const std::vector<Satellite> &sats);
+    bool read_sgg_bias(const std::string &path, const std::vector<std::string> &prns,
+                       const std::vector<Satellite> &sats);
 
 private:
+    RinexAtt rnxatt_;
     RinexAtx rnxatx_;
     RinexClk rnxclk_;
     RinexSnx rnxsnx_;
@@ -51,6 +57,7 @@ private:
 
 public:
     std::string name;
+    std::string att_file;
     std::string atx_file;
     std::string clk_file;
     std::string bia_file;

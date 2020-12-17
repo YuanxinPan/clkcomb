@@ -2,7 +2,6 @@
 #define _COORD_H_
 
 #include "CartCoor.h"
-#include "CoordConverter.h"
 #include "Ellipsoid.h"
 #include "JplEph.h"
 
@@ -14,6 +13,8 @@ void cross(const double *p, const double *q, double *out);
 
 // out can share the same address of p
 void unit_vector(const double *p, double *out);
+
+double qAngularDist(const double *qs, const double *qr);
 
 void xyz2blh(const double xyz[], double blh[]);
 
@@ -42,5 +43,10 @@ void rot_enu2ecef(const double *xyz, double *R);
 
 // R: rotation matrix, column major
 void rot_ecef2enu(const double *xyz, double *R);
+
+void SunPosition(int jd, double sod, double rs[]);
+void MoonPosition(int jd, double sod, double rm[]);
+
+void nominal_att(const double *xsat, const double *xsun, double *q);
 
 #endif

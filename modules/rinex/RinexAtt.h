@@ -14,7 +14,7 @@ private:
     {
         MJD t;
         double q[4]; // ECEF => SV
-        bool operator<(MJD mjd) { return t<mjd; }
+        bool operator<(MJD mjd)const { return t<mjd; }
     };
 
 public:
@@ -22,7 +22,8 @@ public:
     ~RinexAtt() {}
 
     bool read(const std::string &path);
-    bool satAtt(MJD t, const std::string &prn, double *R); // SV => ECEF
+    bool sat_att(MJD t, const std::string &prn, double *q)const; // SV => ECEF
+    bool empty()const { return attFile_ == nullptr; }
     void close();
     double interval()const { return interval_; }
     double version()const { return version_; }

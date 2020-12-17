@@ -155,7 +155,7 @@ void quatern2rotmat(const double *q, double *R)
     R[2+3*2] = q00 - q11 - q22 + q33;
 }
 
-bool RinexAtt::satAtt(MJD t, const std::string &prn, double *R)
+bool RinexAtt::sat_att(MJD t, const std::string &prn, double *_q)const
 {
     if (!std::binary_search(prns_.begin(), prns_.end(), prn))
         return false;
@@ -175,6 +175,7 @@ bool RinexAtt::satAtt(MJD t, const std::string &prn, double *R)
         quatern_interp(it->q, (it+1)->q, dist, q);
     }
 
-    quatern2rotmat(q, R); // ECEF => SV
+    // quatern2rotmat(q, R); // ECEF => SV
+    memcpy(_q, q, sizeof(q));
     return true;
 }

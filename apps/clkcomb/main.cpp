@@ -144,11 +144,6 @@ int main(int argc, char *argv[])
 
     std::vector<size_t> prn_counts(nsat_total);
     for (auto it=acs.begin(); it!=acs.end(); ++it) {
-        it->read_clock(config.mjd, config.length, config.interval, config.prns, combined_ac.rnxsp3(), combined_ac.rnxatx());
-
-        if (config.combine_staclk)
-            it->read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
-
         fprintf(stdout, "\n## %3s\n", it->name.c_str());
         std::vector<size_t> clk_count;
         count_satclks(config, it->sat_clks, clk_count);

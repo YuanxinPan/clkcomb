@@ -48,9 +48,32 @@ std::string replace_pattern(const std::string &pattern, MJD t,
 bool init_acs(config_t &config, const std::vector<Satellite> &sats,
               std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac)
 {
+    // AC of combined orbit
+    combined_ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined_ac.name);
+    combined_ac.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, combined_ac.name);
+    combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
+    combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
+    combined_ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined_ac.name);
+    combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
+    if (config.use_att && !combined_ac.read_att(combined_ac.att_file))
+        fprintf(stderr, MSGWAR "use nominal attitude\n");
+    if (!combined_ac.read_orbit(combined_ac.sp3_file) ||
+        !combined_ac.open_clock(combined_ac.clk_file) ||
+        !combined_ac.open_atx(combined_ac.atx_file) ||
+        (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
+        fprintf(stderr, MSG_ERR "no combined sp3 file: %s\n", combined_ac.sp3_file.c_str());
+        return false;
+    }
+    // combined_ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt());
+    // if (config.combine_staclk)
+    //     combined_ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
+
+    // each AC
     for (auto it=config.ac_names.begin(); it!=config.ac_names.end(); ++it) {
         acs.emplace_back(*it);
         AnalyseCenter &ac = acs.back();
+
+        fprintf(stderr, "%3s...\n", it->c_str());
 
         // std::vector<std::string> sp3_files;
         // for (int i=0; i!=3; ++i) {
@@ -59,12 +82,16 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         //     sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, *it));
         // }
         ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, *it);
+        ac.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, *it);
         ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, *it);
         ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
         ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
         ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
         if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
+            || (config.use_att && !ac.read_att(ac.att_file))
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
+            || !ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt())
+            || (config.combine_staclk && !ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx()))
             || (config.phase_clock && !ac.read_bias(ac.bia_file, config.prns, sats))) {
             acs.pop_back();
             fprintf(stderr, MSG_WAR "remove AC without products: %s\n", it->c_str());
@@ -98,21 +125,6 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         printf("\n\n");
     }
 
-    combined_ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined_ac.name);
-    combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
-    combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
-    combined_ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined_ac.name);
-    combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
-    if (!combined_ac.read_orbit(combined_ac.sp3_file) ||
-        !combined_ac.open_clock(combined_ac.clk_file) ||
-        !combined_ac.open_atx(combined_ac.atx_file) ||
-        (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
-        fprintf(stderr, MSG_ERR "no combined sp3 file: %s\n", combined_ac.sp3_file.c_str());
-        return false;
-    }
-    // combined_ac.read_clock(config.mjd, config.length, config.interval, config.prns, combined_ac.rnxsp3());
-    // if (config.combine_staclk)
-    //     combined_ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
 
     // Check whether we have enough ACs
     if (acs.size() < 3u) {
@@ -137,7 +149,7 @@ bool sat_freq(const std::string &prn, double f[])
             break;
         case 'C':
             f[0] = BDS_f1;
-            f[1] = BDS_f2;
+            f[1] = BDS_f3;
             break;
         case 'R':
             f[0] = GLS_f1;
@@ -165,10 +177,12 @@ bool sat_obstp(const std::string &prn, std::string obstp[])
             obstp[2] = "C1X";
             obstp[3] = "C5X";
             break;
-        // case 'C':
-        //     f[0] = BDS_f1;
-        //     f[1] = BDS_f2;
-        //     break;
+        case 'C':
+            obstp[0] = "L2I";
+            obstp[1] = "L6I";
+            obstp[2] = "C2I";
+            obstp[3] = "C6I";
+            break;
         // case 'R':
         //     f[0] = GLS_f1;
         //     f[1] = GLS_f2;

@@ -203,7 +203,7 @@ bool RinexAtx::open(const std::string &path)
     return true;
 }
 
-const RinexAtx::atx_t *RinexAtx::atx(MJD t, const std::string &ant)
+const RinexAtx::atx_t *RinexAtx::atx(MJD t, const std::string &ant)const
 {
     // check cache
     auto it = std::find(atxs_.begin(), atxs_.end(), ant);
@@ -231,7 +231,7 @@ const RinexAtx::atx_t *RinexAtx::atx(MJD t, const std::string &ant)
     return nullptr;
 }
 
-bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)
+bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)const
 {
     rewind(atxFile_);
     skip_header(atxFile_);
@@ -289,7 +289,7 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)
     return false;
 }
 
-void RinexAtx::read_atx(FILE *fp, atx_t &atx)
+void RinexAtx::read_atx(FILE *fp, atx_t &atx)const
 {
     int nzen = static_cast<int>((atx.zen2-atx.zen1)/atx.dzen) + 1;
     int nazi = atx.dazi==0.0 ? 1 : static_cast<int>(360.0/atx.dazi) + 2;  // NOAZI
@@ -338,7 +338,7 @@ void RinexAtx::read_atx(FILE *fp, atx_t &atx)
     }
 }
 
-void RinexAtx::skip_atx(FILE *fp)
+void RinexAtx::skip_atx(FILE *fp)const
 {
     static char buf[BUFSIZ];
     while (fgets(buf, sizeof(buf), fp) &&
