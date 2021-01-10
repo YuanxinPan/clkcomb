@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 
     const size_t nac_total  = acs.size();
     const size_t nsat_total = config.prns.size();
-    const size_t nsys_total = config.strsys.size();
+    const size_t nsys_total = config.syss.size();
     const size_t nepo_total = config.length/config.interval + 1;
     const size_t nsta_total = config.sta_list.size();
     const size_t nepo_total_sta = config.length/config.sta_interval + 1;
@@ -128,17 +128,18 @@ int main(int argc, char *argv[])
     fprintf(stdout, "satellite: %lu\n", nsat_total);
     fprintf(stdout, "epo_total: %-lu\n\n", nepo_total);
 
-    if (config.phase_clock) {
-        for (auto it=acs.begin(); it!=acs.end(); ++it)
-        {
-            std::string bia_file = replace_pattern(config.bia_pattern, config.mjd, it->name);
-            write_fip(bia_file, config.mjd, sats, it->wl_bias, it->nl_bias);
-        }
-    }
+    // if (config.phase_clock) {
+    //     for (auto it=acs.begin(); it!=acs.end(); ++it)
+    //     {
+    //         std::string bia_file = replace_pattern(config.bia_pattern, config.mjd, it->name);
+    //         write_fip(bia_file, config.mjd, sats, it->wl_bias, it->nl_bias);
+    //     }
+    // }
 
     std::vector<std::vector<int>> prns_per_system(nsys_total);
     for (size_t i=0; i<nsat_total; ++i) {
-        int isys = config.strsys.find(config.prns[i][0]);
+        enum GNSS_Tp tp = prn2sys(config.prns[i]);
+        int isys = std::find(config.syss.begin(), config.syss.end(), tp) - config.syss.begin();
         prns_per_system[isys].push_back(i);
     }
 
@@ -222,6 +223,16 @@ int main(int argc, char *argv[])
         // write_satclks(stdout, config, acs[i].name, acs[i].sat_clks);
     }
 
+    std::vector<double> datum_clks;
+    for (size_t iepo=0; iepo!=nepo_total; ++iepo) {
+        double sum = 0;
+        for (auto it=common_prns[0].cbegin(); it!=common_prns[0].cend(); ++it) {
+            sum += acs[0].sat_clks[*it][iepo];
+        }
+        double mean = sum/common_prns[0].size();
+        datum_clks.push_back(mean);
+    }
+
     // Output aligned station clks
     // for (size_t iac=0; iac!=acs.size(); ++iac)
     //     for (size_t ista=0; ista!=config.sta_list.size(); ++ista)
@@ -248,19 +259,23 @@ int main(int argc, char *argv[])
     if (config.combine_staclk)
         construct_init_staclk(config, acs, comb_staclks);
 
-    // fprintf(stderr, "Write clock diff...\n");
+    fprintf(stderr, "Write clock diff...\n");
     // for (size_t iac=0; iac!=nac_total; ++iac)
     //     for (size_t isys=0; isys!=nsys_total; ++isys)
-    //         for (auto it=prns_per_system[isys].begin()+1; it!=prns_per_system[isys].end(); ++it)
+    //         // for (auto it=prns_per_system[isys].begin()+1; it!=prns_per_system[isys].end(); ++it)
+    //         for (auto it=prns_per_system[isys].begin(); it!=prns_per_system[isys].end(); ++it)
     //             for (size_t iepo=0; iepo!=nepo_total; ++iepo)
     //             {
-    //                 double diff = acs[iac].sat_clks[*it][iepo] - acs[iac].sat_clks[prns_per_system[isys][0]][iepo] - (comb_clks[*it][iepo] - comb_clks[prns_per_system[isys][0]][iepo]);
-    //                 if (comb_clks[*it][iepo]!=None && acs[iac].sat_clks[*it][iepo]!=None)
+    //                 // double diff = acs[iac].sat_clks[*it][iepo] - acs[iac].sat_clks[prns_per_system[isys][0]][iepo] - (comb_clks[*it][iepo] - comb_clks[prns_per_system[isys][0]][iepo]);
+    //                 // double diff = acs[iac].sat_clks[*it][iepo] - acs[iac].sat_clks[prns_per_system[isys][0]][iepo] - (acs[0].sat_clks[*it][iepo] - acs[0].sat_clks[prns_per_system[isys][0]][iepo]);
+    //                 double diff = acs[iac].sat_clks[*it][iepo] - (acs[0].sat_clks[*it][iepo]);
+    //                 if (acs[0].sat_clks[*it][iepo]!=None && acs[iac].sat_clks[*it][iepo]!=None)
     //                     fprintf(stdout, "diff %4lu %3s %3s %16.3f\n", iepo, acs[iac].name.c_str(), sats[*it].prn.c_str(), diff);
     //             }
 
     // for (size_t i=0; i!=nac_total; ++i)
-    //     write_satclks_diff(stdout, config, acs[i].name, acs[i].sat_clks, comb_clks);
+    //     write_satclks_diff(stdout, config, acs[i].name, acs[i].sat_clks, acs[0].sat_clks);
+        // write_satclks_diff(stdout, config, acs[i].name, acs[i].sat_clks, comb_clks);
 
     bool weight_ac = config.weight_method == "ac" || config.combine_staclk;
     // Iteration
@@ -316,6 +331,11 @@ int main(int argc, char *argv[])
                 remove_clock_bias(acs[i].name, sats[0], acs[i].sta_clks[isit], comb_staclks[isit],
                         false, clk_std, niter!=1);
             }
+        }
+
+        if (niter == 1) {
+            for (size_t i=0; i!=nac_total; ++i)
+                write_satclks_diff(stdout, config, acs[i].name, acs[i].sat_clks, comb_clks);
         }
 
         // AC weight
@@ -392,9 +412,7 @@ int main(int argc, char *argv[])
             // write_satclks(stdout, config, "com", comb_clks);
         // Debug
         if (niter == 1) {
-            for (size_t i=0; i!=nac_total; ++i)
-                write_satclks_diff(stdout, config, acs[i].name, acs[i].sat_clks, acs[0].sat_clks);
-            write_satclks_diff(stdout, config, "xxx", comb_clks, acs[0].sat_clks);
+            // write_satclks_diff(stdout, config, "xxx", comb_clks, acs[0].sat_clks);
         }
 
         if (!config.combine_staclk)
@@ -436,11 +454,58 @@ int main(int argc, char *argv[])
     // write_satclks(stdout, config, "com", comb_clks);
 
     // Compare with IGS clocks
-    // if (config.combine_staclk)
-    //     compare_staclks(config, "xxx", comb_staclks, combined_ac.sta_clks, true);
+    if (config.combine_staclk)
+        for (size_t i=0; i!=nac_total; ++i)
+            compare_staclks(config, acs[i].name, acs[i].sta_clks, comb_staclks, false);
 
     for (size_t i=0; i!=nac_total; ++i)
         compare_satclks(config, acs[i].name, acs[i].sat_clks, comb_clks, false);
+
+    // align to broadcast ephemeris
+    if (config.align_brdc) {
+        std::string nav_file = config.product_path + replace_pattern(config.nav_pattern, config.mjd);
+        RinexNav rnxnav;
+        if (!rnxnav.read(nav_file))
+            return 1;
+
+        MJD t = config.mjd;
+        double xsum=0, ysum=0, xysum=0, x2sum=0;
+        for (size_t iepo=0; iepo!=nepo_total; ++iepo) {
+            t.sod = iepo*config.interval;
+            double sum = 0, clk;
+            for (auto it=common_prns[0].cbegin(); it!=common_prns[0].cend(); ++it) {
+                const Ephemeris *eph = rnxnav.eph(t, config.prns[*it]);
+                if (eph == nullptr) {
+                    fprintf(stderr, "no nav: %3s %5d %7.0f\n", config.prns[*it].c_str(), t.d, t.sod);
+                    return 1;
+                }
+                eph->satClk(t, clk);
+                sum += clk*1E9;
+            }
+            double mean = sum/common_prns[0].size();
+            double diff = mean - datum_clks[iepo];
+            xsum += iepo;       ysum += diff;
+            xysum += iepo*diff; x2sum += iepo*iepo;
+        }
+        double a = (x2sum*ysum - xsum*xysum)/(x2sum*nepo_total - xsum*xsum);
+        double b = (nepo_total*xysum - xsum*ysum)/(nepo_total*x2sum - xsum*xsum);
+        fprintf(stdout, "brdc fit: %12.3f %12.3f\n", a*1E3, b*1E3*86400/config.interval);
+
+        size_t sample_ratio = config.sta_interval/config.interval;
+        for (size_t iepo=0; iepo!=nepo_total; ++iepo)
+        {
+            double corr = a + b*iepo;
+            for (size_t isat=0; isat!=nsat_total; ++isat)
+                if (comb_clks[isat][iepo] != None)
+                    comb_clks[isat][iepo] += corr;
+
+            if (!config.combine_staclk || iepo%sample_ratio != 0)
+                continue;
+            for (auto it=comb_staclks.begin(); it!=comb_staclks.end(); ++it)
+                if (it->at(iepo/sample_ratio) != None)
+                    it->at(iepo/sample_ratio) += corr;
+        }
+    }
 
     // ns => s
     for (size_t sat=0; sat!=nsat_total; ++sat)
@@ -452,22 +517,16 @@ int main(int argc, char *argv[])
             for (size_t epo=0; epo!=nepo_total_sta; ++epo)
                 comb_staclks[sta][epo] /= 1E9;
 
-    // align to broadcast ephemeris
-    // std::string nav_file = config.product_path + replace_pattern(config.nav_pattern, config.mjd);
-    // RinexNav rnxnav;
-    // if (!rnxnav.read(nav_file))
-    //     return 1;
-
     std::string clk_file = replace_pattern(config.clk_pattern, config.mjd, "xxx");
-    write_clkfile(clk_file, config, comb_clks, comb_staclks);
+    write_clkfile(clk_file, config, comb_clks, comb_staclks, combined_ac.rnxsnx());
 
     if (config.phase_clock) {
         std::string bia_file = replace_pattern(config.bia_pattern, config.mjd, "xxx");
         write_bias(bia_file, config.mjd, sats, acs[0].wl_bias);
 
-        bia_file = replace_pattern(config.bia_pattern, config.mjd, "fip");
-        combined_ac.nl_bias.resize(nsat_total);
-        write_fip(bia_file, config.mjd, sats, acs[0].wl_bias, combined_ac.nl_bias);
+        // bia_file = replace_pattern(config.bia_pattern, config.mjd, "fip");
+        // combined_ac.nl_bias.resize(nsat_total);
+        // write_fip(bia_file, config.mjd, sats, acs[0].wl_bias, combined_ac.nl_bias);
     }
 
     return 0;

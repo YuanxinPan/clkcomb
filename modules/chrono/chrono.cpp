@@ -40,6 +40,14 @@ void mjd2date(int jd, double sod, int *iy, int *imon, int *id, int *ih, int *im,
     sod2hms(msod, ih, im, is);
 }
 
+int ydoy2mjd(int year, int doy)
+{
+    int m, d;
+    year = yr2year(year);
+    doy2date(year, doy, &m, &d);
+    return date2mjd(year, m, d);
+}
+
 void wksow2mjd(int week, double sow, int *mjd, double *sod)
 {
     *mjd = week * 7 + 44244 + (int)(sow / 86400.0);

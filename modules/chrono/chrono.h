@@ -34,6 +34,8 @@ int date2doy(int y, int m, int d);
 
 void doy2date(int iyear, int idoy, int *imonth, int *iday);
 
+int ydoy2mjd(int year, int doy);
+
 void date2gwk(int year, int month, int day, int *week, int *wd);
 
 const char *run_tim();

@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 
+#include <pppx/const.h>
 #include <pppx/chrono.h>
 
 typedef struct TAGCONFIG
@@ -17,8 +18,9 @@ typedef struct TAGCONFIG
     // constellation
     // int system = 0;       // sys |= 1<<GLS
     std::string strsys;      // GREC, etc.
-    std::vector<std::string> prns;
-    std::vector<std::string> excluded_prns;
+    std::vector<enum GNSS_Tp> syss;
+    std::vector<std::string>  prns;
+    std::vector<std::string>  excluded_prns;
 
     std::vector<std::string> sta_list;
 
@@ -45,6 +47,9 @@ typedef struct TAGCONFIG
     // std::string eph_path; // JPL ephmeris
     // std::string lps_path; // leap second
     // std::string chn_path; // glonass channel
+
+    // output
+    bool align_brdc = false;
 
 } config_t;
 

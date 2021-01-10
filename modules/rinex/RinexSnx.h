@@ -13,8 +13,10 @@ public:
 
     bool read(const std::string &path);
     bool find_pos(const std::string &site, CartCoor &pos) const;
+    bool find_dome(const std::string &site, std::string &dome) const;
 
 private:
+    std::map<std::string, std::string> domes_;
     std::map<std::string, CartCoor> poss_;
 };
 

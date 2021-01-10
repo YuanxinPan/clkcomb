@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <pppx/const.h>
 
 std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix=std::string(),
@@ -78,7 +79,8 @@ void compare_staclks(const config_t &config, const std::string &name,
 
 bool write_clkfile(const std::string &path, const config_t &config,
                    const std::vector<std::vector<double>> &satclks,
-                   const std::vector<std::vector<double>> &staclks);
+                   const std::vector<std::vector<double>> &staclks,
+                   const RinexSnx &rnxsnx);
 
 bool write_bias(const std::string &path, MJD t,
                 const std::vector<Satellite> &sats,
@@ -91,5 +93,8 @@ double median(const std::vector<double> &vals);
 void unit_weight(std::vector<double> &wgts);
 
 bool sat_freq(const std::string &prn, double f[]);
+
+enum GNSS_Tp prn2sys(const std::string &prn);
+char sys2char(enum GNSS_Tp tp);
 
 #endif // UTILS_H

@@ -14,7 +14,28 @@ bool RinexSnx::read(const std::string &path)
         return false;
     }
 
+    // DOME
     char buf[BUFSIZ];
+    while (fgets(buf, sizeof(buf), fp)) {
+        if (strncmp(buf, "+SITE/ID", 8) == 0) {
+            fgets(buf, sizeof(buf), fp);
+            break;
+        }
+    }
+
+    std::string site;
+    std::string dome;
+    while (fgets(buf, sizeof(buf), fp)) {
+        if (strncmp(buf, "-SITE/ID", 8) == 0)
+            break;
+        site.assign(buf+1, 4);
+        dome.assign(buf+9, 9);
+        std::transform(site.begin(), site.end(), site.begin(),
+                    [](unsigned char c) { return std::toupper(c); });
+        domes_[site] = dome;
+    }
+
+    // ESTIMATE
     while (fgets(buf, sizeof(buf), fp)) {
         if (strncmp(buf, "+SOLUTION/ESTIMATE", 18) == 0) {
             fgets(buf, sizeof(buf), fp);
@@ -22,7 +43,6 @@ bool RinexSnx::read(const std::string &path)
         }
     }
 
-    std::string site;
     CartCoor pos;
     while (fgets(buf, sizeof(buf), fp)) {
         if (strncmp(buf, "-SOLUTION/ESTIMATE", 18) == 0)
@@ -56,6 +76,17 @@ bool RinexSnx::read(const std::string &path)
     // printf("\n");
 
     return true;
+}
+
+bool RinexSnx::find_dome(const std::string &site, std::string &dome) const
+{
+    if (domes_.find(site) == domes_.end())
+        return false;
+    else {
+        auto it = domes_.find(site);
+        dome = it->second;
+        return true;
+    }
 }
 
 bool RinexSnx::find_pos(const std::string &site, CartCoor &pos) const

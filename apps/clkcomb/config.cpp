@@ -1,4 +1,5 @@
 #include "config.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -126,8 +127,10 @@ static int handler(void* user, const char* section, const char* name, const char
         pconfig->atx_pattern.assign(value);
     // } else if (MATCH("table", "jpleph")) {
     //     pconfig->eph_path.assign(value);
-    // } else if (MATCH("table", "leapsec")) {
-    //     pconfig->lps_path.assign(value);
+    } else if (MATCH("output", "align brdc")) {
+        std::string v(value);
+        if (v=="True" || v=="true")
+            pconfig->align_brdc = true;
     } else {
         //return 0;  /* unknown section/name, error */
     }
@@ -219,15 +222,11 @@ bool collect_valid_prns(config_t &config)
     std::set<char> set;
     std::for_each(config.prns.begin(), config.prns.end(),
                   [&set] (std::string &prn) { set.insert(prn[0]); });
-    std::string strtmp, systmp=config.strsys;
-    std::sort(systmp.begin(), systmp.end()); // to keep original order in config.strsys
-    std::set_intersection(systmp.begin(), systmp.end(),
-                          set.begin(), set.end(), std::back_inserter(strtmp));
-    systmp.clear();
-    for (auto it=config.strsys.begin(); it!= config.strsys.end(); ++it)
-        if (std::string::npos != strtmp.find(*it))
-            systmp.push_back(*it);
-    config.strsys.swap(systmp);
+    std::string strtmp(config.strsys);
+    config.strsys.clear();
+    std::sort(strtmp.begin(), strtmp.end());
+    std::set_intersection(strtmp.begin(), strtmp.end(),
+                          set.begin(), set.end(), std::back_inserter(config.strsys));
 
     // remove prns without constellation request
     for (auto it=config.prns.begin(); it!=config.prns.end(); ++it) {
@@ -241,6 +240,22 @@ bool collect_valid_prns(config_t &config)
         fprintf(stderr, MSG_ERR "collect_valid_prns: empty prns list\n");
         return false;
     }
+
+    // fill vector:syss
+    std::set<enum GNSS_Tp> tps;
+    for_each(config.prns.begin(), config.prns.end(),
+            [&tps] (std::string &prn) { tps.insert(prn2sys(prn)); });
+    config.syss.assign(tps.begin(), tps.end());
+
+    // auto igps = std::find(config.syss.begin(), config.syss.end(), _GPS_);
+    // if (igps!=config.syss.end() && igps!=config.syss.begin()) {
+    //     std::swap(*igps, config.syss.front());
+    // }
+
+    // map syss to strsys
+    config.strsys.clear();
+    for_each(config.syss.begin(), config.syss.end(),
+            [&config](enum GNSS_Tp tp) { config.strsys.push_back(sys2char(tp)); });
 
     // std::map<char, int> sys{ {'G', _GPS_}, {'R', _GLS_}, {'E', _GAL_},
     //                          {'C', _BDS_}, {'J', _QZS_} };
@@ -295,6 +310,10 @@ void print_config(FILE *fp, const config_t &config)
     fprintf(fp, "atx: %s\n", config.atx_pattern.c_str());
     // fprintf(fp, "eph: %s\n", config.eph_path.c_str());
     // fprintf(fp, "lps: %s\n", config.lps_path.c_str());
+
+    fprintf(fp, "\n[output]\n");
+    str = config.align_brdc ? "true" : "false";
+    fprintf(fp, "align brdc: %s\n", str.c_str());
 
     fflush(fp);
 }

@@ -200,6 +200,7 @@ bool RinexAtx::open(const std::string &path)
                 "RinexAtx::read: not an absolute atx: %s\n", path.c_str());
         return false;
     }
+    atxs_.reserve(150);
     return true;
 }
 
@@ -258,7 +259,7 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)const
                 skip_atx(atxFile_);
             else if (issatatx)
                 atx.svn_.assign(buf+40, 4);
-                atx.svType_.assign(buf, 12);
+                atx.blk_.assign(buf, 12);
         }
         else if (strncmp(buf+60, "DAZI", 4) == 0)
             sscanf(buf, "%lf", &atx.dazi);

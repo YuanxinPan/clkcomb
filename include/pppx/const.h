@@ -22,8 +22,10 @@ enum GNSS_Tp {
     _GPS_ = 0,
     _GLS_,
     _GAL_,
-    _BDS_,
-    _QZS_
+    _BD2_,
+    _BD3_,
+    _QZS_,
+    _UNKNOWN_ = 99
 };
 
 // GPS frequency

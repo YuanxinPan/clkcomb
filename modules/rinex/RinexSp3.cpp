@@ -148,6 +148,7 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
 
         int y, m, d, h, min;
         double s;
+        MJD t;
         Sp3_t sp3;
         do {
             if (buf[0] == '*') {
@@ -159,6 +160,11 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
                 }
                 sp3.t.d = date2mjd(y, m, d);
                 sp3.t.sod = hms2sod(h, min, s);
+                if (t.d == 0) {
+                    t = sp3.t;
+                } else if (sp3.t-t > 86400.0-1E-3) { // skip the predicted records
+                    break;
+                }
             }
             else {
                 int n = sscanf(buf+4, "%lf%lf%lf", &sp3.pos.x, &sp3.pos.y, &sp3.pos.z);

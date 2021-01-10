@@ -13,40 +13,6 @@
 #include <array>
 #include <cctype>
 
-bool AnalyseCenter::read_orbit(const std::string &path)
-{
-    return rnxsp3_.read(path);
-}
-
-// bool AnalyseCenter::read_orbit(const std::vector<std::string> &paths)
-// {
-//     if (rnxsp3_.read(paths)) {
-//         return true;
-//     } else {
-//         return false;
-//     }
-// }
-
-bool AnalyseCenter::read_att(const std::string &path)
-{
-    return rnxatt_.read(path);
-}
-
-bool AnalyseCenter::read_sinex(const std::string &path)
-{
-    return rnxsnx_.read(path);
-}
-
-bool AnalyseCenter::open_atx(const std::string &path)
-{
-    return rnxatx_.open(path);
-}
-
-bool AnalyseCenter::open_clock(const std::string &path)
-{
-    return rnxclk_.read(path);
-}
-
 bool AnalyseCenter::read_clock(const config_t &config, const RinexSp3 &refsp3,
                                const RinexAtx &refatx, const RinexAtt &refatt)
 {
@@ -60,25 +26,39 @@ bool AnalyseCenter::read_clock(const config_t &config, const RinexSp3 &refsp3,
     sat_clks.clear();
     sat_clks.resize(nsat_total);
 
+    // clock & orbit
     double clk, corr;
+    CartCoor pos, ref;
+
+    // Atx
     const RinexAtx::atx_t *atx_src = nullptr;
     const RinexAtx::atx_t *atx_dst = nullptr;
     double psrc[3], pdst[3];
+    std::string f1, f2;
+    std::vector<const RinexAtx::atx_t *> src_atxs;
+    std::vector<const RinexAtx::atx_t *> dst_atxs;
+    for (size_t isat=0; isat!=nsat_total; ++isat) {
+        src_atxs.push_back(rnxatx_.atx(t, prns[isat]));
+        dst_atxs.push_back(refatx.atx(t, prns[isat]));
+    }
+
+    // Att
     double qr[4], qs[4];
     double xsun[3], f[2];
     std::vector<double> diffs[2];
     diffs[0].resize(prns.size());
     diffs[1].resize(prns.size());
-    std::string f1, f2;
-    CartCoor pos, ref;
+
     for (size_t epo=0; epo!=nepo_total; ++epo, t+=interval) {
         for (size_t isat=0; isat!=nsat_total; ++isat) {
-            if (!rnxclk_.clkBias(t, prns[isat], clk))
+            if (!rnxclk_.clkBias(t, prns[isat], clk)) {
+                // fprintf(stderr, "%3s %5lu %3s: no clk\n", name.c_str(), epo, prns[isat].c_str());
                 clk = None;
+            }
 
             // Antenna correction
-            atx_src = rnxatx_.atx(t, prns[isat]);
-            atx_dst = refatx.atx(t, prns[isat]);
+            atx_src = src_atxs[isat];
+            atx_dst = dst_atxs[isat];
             if (atx_src == nullptr || atx_dst == nullptr)
                 clk = None;
             else if (clk != None) {
@@ -99,6 +79,7 @@ bool AnalyseCenter::read_clock(const config_t &config, const RinexSp3 &refsp3,
             // Orbit correction
             if (!rnxsp3_.satPos(t, prns[isat], pos) ||
                 !refsp3.satPos( t, prns[isat], ref)) {
+                // fprintf(stderr, "%3s %5lu %3s: no orb\n", name.c_str(), epo, prns[isat].c_str());
                 clk = None;
             } else if (clk != None) {
                 corr = (pos - ref).dot(pos)/pos.norm();
@@ -195,60 +176,6 @@ bool AnalyseCenter::read_staclk(MJD t, int length, int interval,
     return true;
 }
 
-bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::string> &prns,
-                              const std::vector<Satellite> &sats)
-{
-    if (name == "grg") {
-        return read_grg_bias(clk_file, prns);
-    } else if (name == "cos" || name == "gfs" || name == "grs" ) {
-        return read_sgg_bias(bia_file, prns, sats);
-    } else if (name == "cod" || name == "whu") {
-        return read_snx_bias(bia_file, prns, sats);
-    } else {
-        fprintf(stdout, MSG_ERR "AnalyseCenter::read_bias: unsupported ac: %3s\n", name.c_str());
-        return false;
-    }
-}
-
-bool AnalyseCenter::read_grg_bias(const std::string &path, const std::vector<std::string> &prns)
-{
-    FILE *fp = fopen(path.c_str(), "r");
-    if (fp == nullptr) {
-        fprintf(stderr, MSG_ERR "AnalyseCenter::read_bias: no such file: %s\n", path.c_str());
-        return false;
-    }
-
-    have_bias.assign(prns.size(), 0);
-    wl_bias.resize(prns.size());
-    nl_bias.resize(prns.size());
-
-    char buf[BUFSIZ];
-    std::string prn;
-    int index;
-    double val;
-    while (fgets(buf, sizeof(buf), fp))
-    {
-        if (strncmp(buf+60, "END OF HEADER", 13) == 0)
-            break;
-        else if (strncmp(buf, "WL ", 3) != 0)
-            continue;
-
-        prn.assign(buf+3, 3);
-        val = atof(buf+40);
-        if (!std::binary_search(prns.begin(), prns.end(), prn))
-            continue;
-        auto it = std::lower_bound(prns.begin(), prns.end(), prn);
-        index =  it - prns.begin();
-        have_bias[index] = 1;
-        wl_bias[index] = -val; // cycle
-
-        fprintf(stdout, "%3s %3s %8.3f\n", name.c_str(), prns[index].c_str(), wl_bias[index]);
-    }
-
-    fclose(fp);
-    return true;
-}
-
 static void convert_bias(const double f[], const std::array<double, 4> &bias, double &wl, double &nl)
 {
     double g = f[0]/f[1];
@@ -264,6 +191,124 @@ static void convert_bias(const double f[], const std::array<double, 4> &bias, do
     // bias: L1 L2 P1 P2 (ns)
     wl = (bias[0]*w1 + bias[1]*w2 + bias[2]*n1 + bias[3]*n2)*fw/1E9;
     nl = (bias[0]*alpha + bias[1]*beta)*fn/1E9;
+}
+
+bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::string> &prns,
+                              const std::vector<Satellite> &sats)
+{
+    FILE *fp = fopen(path.c_str(), "r");
+    if (fp == nullptr) {
+        fprintf(stderr, MSG_ERR "AnalyseCenter::read_bias: no such file: %s\n", path.c_str());
+        return false;
+    }
+
+    have_bias.assign(prns.size(), 0);
+    wl_bias.resize(prns.size());
+    nl_bias.resize(prns.size());
+    const int interval = 30; // sec
+    const size_t nepo_total = sat_clks[0].size();
+    const size_t nsat_total = prns.size();
+    std::vector<std::vector<std::array<double, 4>>> bias(nsat_total); // L1 L2 P1 P2
+    for (size_t i=0; i!=nsat_total; ++i)
+        bias[i].resize(nepo_total);
+
+    char buf[BUFSIZ];
+    std::string prn;
+    int mjd=0, mjd0, mjd1, sod0, sod1, year, doy;
+    int index;
+    double val;
+    while (fgets(buf, sizeof(buf), fp))
+    {
+        if (strncmp(buf, " OSB ", 5) || buf[15]!=' ')
+            continue;
+
+        prn.assign(buf+11, 3);
+        val = atof(buf+70); // ns
+        if (!std::binary_search(prns.begin(), prns.end(), prn))
+            continue;
+        auto it = std::lower_bound(prns.begin(), prns.end(), prn);
+        index =  it - prns.begin();
+
+        sscanf(buf+35, "%d:%d:%d", &year, &doy, &sod0);
+        mjd0 = ydoy2mjd(year, doy);
+        sscanf(buf+50, "%d:%d:%d", &year, &doy, &sod1);
+        mjd1 = ydoy2mjd(year, doy);
+
+        if (mjd == 0) mjd = mjd0;
+        sod0 = (mjd0 - mjd)*86400 + sod0;
+        sod1 = (mjd1 - mjd)*86400 + sod1;
+
+        // have_bias[index] = 1;
+        for (int i=0; i!=4; ++i) { // L1 L2 P1 P2
+            if (strncmp(buf+25, sats[index].obstp[i].c_str(), 3))
+                continue;
+
+            size_t beg = sod0/interval;
+            size_t end = std::min(static_cast<size_t>(sod1/interval), nepo_total);
+            for (size_t epo=beg; epo<end; ++epo)
+                bias[index][epo][i] = val;
+            break;
+        }
+    }
+
+    std::vector<std::vector<double>> wls(nsat_total), nls(nsat_total);
+    for (size_t i=0; i!=nsat_total; ++i) {
+        wls[i].resize(nepo_total);
+        nls[i].resize(nepo_total);
+    }
+    for (size_t isat=0; isat!=nsat_total; ++isat) {
+        for (size_t iepo=0; iepo!=nepo_total; ++iepo) {
+            if (bias[isat][iepo][0]!=0.0 || bias[isat][iepo][1]!=0.0) {
+                convert_bias(sats[isat].f, bias[isat][iepo], wls[isat][iepo], nls[isat][iepo]);
+            }
+        }
+    }
+    // Average WLs
+    for (size_t isat=0; isat!=nsat_total; ++isat)
+    {
+        int count=0;
+        double sum=0;
+        for (size_t iepo=0; iepo!=nepo_total; ++iepo) {
+            if (wls[isat][iepo]==0.0 && nls[isat][iepo]==0.0)
+                continue;
+            sum += wls[isat][iepo];
+            ++count;
+        }
+        if (count != 0) {
+            wl_bias[isat] = sum/count;
+            have_bias[isat] = 1;
+        }
+    }
+
+    for (size_t isat=0; isat!=nsat_total; ++isat) {
+        double freq = sats[isat].f[0] + sats[isat].f[1]; // NL
+        for (size_t iepo=0; iepo!=nepo_total; ++iepo) {
+            if (sat_clks[isat][iepo] != None)
+                sat_clks[isat][iepo] -= nls[isat][iepo]*(1E9/freq); // ns
+        }
+    }
+
+    fclose(fp);
+    return true;
+}
+
+#if 0
+bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::string> &prns,
+                              const std::vector<Satellite> &sats)
+{
+    // if (name == "grg") {
+    //     return read_grg_bias(clk_file, prns);
+    // } else if (name == "cos" || name == "esa" || name == "gfs" || name == "grs" ) {
+    //     return read_sgg_bias(bia_file, prns, sats);
+    // } else if (name == "gfz") {
+    //     return read_cnes_bias(bia_file, prns, sats);
+    // } else if (name == "cod" || name == "whu") {
+    //     return read_snx_bias(bia_file, prns, sats);
+    // } else {
+    //     fprintf(stdout, MSG_ERR "AnalyseCenter::read_bias: unsupported ac: %3s\n", name.c_str());
+    //     return false;
+    // }
+    return read_biassnx(bia_file, prns, sats);
 }
 
 bool AnalyseCenter::read_snx_bias(const std::string &path, const std::vector<std::string> &prns,
@@ -310,6 +355,45 @@ bool AnalyseCenter::read_snx_bias(const std::string &path, const std::vector<std
         convert_bias(sats[i].f, bias[i], wl_bias[i], nl_bias[i]);
         fprintf(stdout, "%3s %3s %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f\n", name.c_str(), prns[i].c_str(),
                 bias[i][0], bias[i][1], bias[i][2], bias[i][3], wl_bias[i], nl_bias[i]);
+    }
+
+    fclose(fp);
+    return true;
+}
+
+bool AnalyseCenter::read_grg_bias(const std::string &path, const std::vector<std::string> &prns)
+{
+    FILE *fp = fopen(path.c_str(), "r");
+    if (fp == nullptr) {
+        fprintf(stderr, MSG_ERR "AnalyseCenter::read_bias: no such file: %s\n", path.c_str());
+        return false;
+    }
+
+    have_bias.assign(prns.size(), 0);
+    wl_bias.resize(prns.size());
+    nl_bias.resize(prns.size());
+
+    char buf[BUFSIZ];
+    std::string prn;
+    int index;
+    double val;
+    while (fgets(buf, sizeof(buf), fp))
+    {
+        if (strncmp(buf+60, "END OF HEADER", 13) == 0)
+            break;
+        else if (strncmp(buf, "WL ", 3) != 0)
+            continue;
+
+        prn.assign(buf+3, 3);
+        val = atof(buf+40);
+        if (!std::binary_search(prns.begin(), prns.end(), prn))
+            continue;
+        auto it = std::lower_bound(prns.begin(), prns.end(), prn);
+        index =  it - prns.begin();
+        have_bias[index] = 1;
+        wl_bias[index] = -val; // cycle
+
+        fprintf(stdout, "%3s %3s %8.3f\n", name.c_str(), prns[index].c_str(), wl_bias[index]);
     }
 
     fclose(fp);
@@ -380,3 +464,91 @@ bool AnalyseCenter::read_sgg_bias(const std::string &path,
     fclose(fp);
     return true;
 }
+
+bool AnalyseCenter::read_cnes_bias(const std::string &path,
+                                   const std::vector<std::string> &prns,
+                                   const std::vector<Satellite> &sats)
+{
+    FILE *fp = fopen(path.c_str(), "r");
+    if (fp == nullptr) {
+        fprintf(stderr, MSG_ERR "AnalyseCenter::read_bias: no such file: %s\n", path.c_str());
+        return false;
+    }
+
+    have_bias.assign(prns.size(), 0);
+    wl_bias.resize(prns.size());
+    nl_bias.resize(prns.size());
+    std::vector<std::array<double, 4>> bias(prns.size()); // L1 L2 P1 P2
+    // std::array<double, 4> bias;
+
+    char buf[BUFSIZ];
+    std::string prn; //, last_prn("XXX");
+    int index;
+    int year=0, doy, sod, sod0=0, mjd0=0, mjd;
+    double val;
+    while (fgets(buf, sizeof(buf), fp))
+    {
+        if (strncmp(buf, " OSB ", 5) || buf[15]!=' ')
+            continue;
+
+        prn.assign(buf+11, 3);
+
+        val = atof(buf+70); // ns
+        if (year == 0) {
+            year = atoi(buf+35);
+            doy = atoi(buf+40);
+            mjd0 = ydoy2mjd(year, doy);
+        }
+        year = atoi(buf+35);
+        doy = atoi(buf+40);
+        mjd = ydoy2mjd(year, doy);
+        sod = atoi(buf+44) + (mjd - mjd0)*86400;
+        if (!std::binary_search(prns.begin(), prns.end(), prn))
+            continue;
+        auto it = std::lower_bound(prns.begin(), prns.end(), prn);
+        index =  it - prns.begin();
+
+        if (sod > 86370)
+            continue;
+
+        if (sod!=sod0 && sod!=0) {
+            int ref = 0;
+            for (size_t i=0; i!=prns.size(); ++i) {
+                if (!have_bias[i])
+                    continue;
+                if (prns[i][0] != 'C')
+                    continue;
+                // ref = std::lower_bound(prns.begin(), prns.end(), "C07") - prns.begin();
+                if (sats[i].blk[7] == '2')
+                    ref = std::lower_bound(prns.begin(), prns.end(), "C06") - prns.begin();
+                else
+                    ref = std::lower_bound(prns.begin(), prns.end(), "C19") - prns.begin();
+                fprintf(stdout, "diff %3s %8d %8.3f %8.3f\n",  prns[i].c_str(), sod,
+                        wl_bias[i]-wl_bias[ref], nl_bias[i]-nl_bias[ref]);
+            }
+            have_bias.assign(prns.size(), 0);
+        }
+
+        int i=0;
+        for (i=0; i!=4; ++i) // L1 L2 P1 P2
+            if (!strncmp(buf+25, sats[index].obstp[i].c_str(), 3)) {
+                // bias[i] = val;
+                bias[index][i] = val;
+                break;
+            }
+
+
+        if (i == 1) {
+            have_bias[index] = 1;
+            convert_bias(sats[index].f, bias[index], wl_bias[index], nl_bias[index]);
+            fprintf(stdout, "%3s %3s %8d %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f\n", name.c_str(), prns[index].c_str(),
+                    sod, bias[index][0], bias[index][1], bias[index][2], bias[index][3], wl_bias[index], nl_bias[index]);
+                    // sod, bias[0], bias[1], bias[2], bias[3], wl_bias[index], nl_bias[index]);
+        }
+        sod0 = sod;
+    }
+
+    fclose(fp);
+    return true;
+}
+#endif

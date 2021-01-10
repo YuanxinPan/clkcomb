@@ -19,34 +19,42 @@ public:
     AnalyseCenter(){}
     ~AnalyseCenter(){}
 
-    bool read_orbit(const std::string &path);
-    bool read_att(const std::string &path);
-    bool read_sinex(const std::string &path);
-    // bool read_orbit(const std::vector<std::string> &paths);
-    bool open_atx(const std::string &path);
-    bool open_clock(const std::string &path);
+    bool read_att(const std::string &path)   { return rnxatt_.read(path); }
+    bool open_atx(const std::string &path)   { return rnxatx_.open(path); }
+    bool open_clock(const std::string &path) { return rnxclk_.read(path); }
+    bool read_orbit(const std::string &path) { return rnxsp3_.read(path); }
+    bool read_orbit(const std::vector<std::string> &paths) { return rnxsp3_.read(paths); }
+    bool read_sinex(const std::string &path) { return rnxsnx_.read(path); }
+
     bool read_bias(const std::string &path, const std::vector<std::string> &prns,
                    const std::vector<Satellite> &sats);
 
     bool read_clock(const config_t &config, const RinexSp3 &refsp3,
                     const RinexAtx &refatx, const RinexAtt &refatt);
 
-    const RinexAtt &rnxatt() { return rnxatt_; }
-    const RinexAtx &rnxatx() { return rnxatx_; }
+    bool read_staclk(MJD t, int length, int interval,
+                     const std::vector<std::string> &sta_list, const RinexSnx &refsnx);
+
+    const RinexAtt &rnxatt()const { return rnxatt_; }
+    const RinexAtx &rnxatx()const { return rnxatx_; }
     const RinexSp3 &rnxsp3()const { return rnxsp3_; }
     const RinexSnx &rnxsnx()const { return rnxsnx_; }
 
     const std::vector<std::string> &sta_names() { return rnxclk_.sta_names(); }
 
-    bool read_staclk(MJD t, int length, int interval,
-                     const std::vector<std::string> &sta_list, const RinexSnx &refsnx);
-
+#if 0
 private:
+    bool read_biassnx(const std::string &path, const std::vector<std::string> &prns,
+                      const std::vector<Satellite> &sats);
     bool read_grg_bias(const std::string &path, const std::vector<std::string> &prns);
     bool read_snx_bias(const std::string &path, const std::vector<std::string> &prns,
                        const std::vector<Satellite> &sats);
     bool read_sgg_bias(const std::string &path, const std::vector<std::string> &prns,
                        const std::vector<Satellite> &sats);
+    bool read_cnes_bias(const std::string &path,
+                        const std::vector<std::string> &prns,
+                        const std::vector<Satellite> &sats);
+#endif
 
 private:
     RinexAtt rnxatt_;
@@ -64,11 +72,11 @@ public:
     std::string snx_file;
     std::string sp3_file;
 
-    std::vector<std::vector<double>> sta_clks; // clk of all stations for all epoches
-    std::vector<std::vector<double>> sat_clks; // clk of all satellites for all epoches
     std::vector<int>    have_bias;
     std::vector<double> wl_bias;
     std::vector<double> nl_bias;
+    std::vector<std::vector<double>> sat_clks; // clk of all satellites for all epoches
+    std::vector<std::vector<double>> sta_clks; // clk of all stations for all epoches
 };
 
 #endif //ANALYSECENTER_H

@@ -66,6 +66,14 @@ static void qinv(const double *q, double *qi)
 
 double qAngularDist(const double *qs, const double *qr)
 {
+    // double cosa = 0;
+    // for (int i=0; i<4; i++) {
+    //     cosa += qs[i]*qr[i];
+    // }
+    // if (cosa < 0.0) {
+    //     for (int i=0; i<4; i++) qs[i] = -qs[i]
+    // }
+
     double qi[4], qc[4];
     qinv(qs, qi);
     qcross(qi, qr, qc);

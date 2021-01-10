@@ -1,12 +1,18 @@
 #include "utils.h"
 
+#include <math.h>
+#include <stdlib.h>
+
 #include <algorithm>
 #include <map>
-#include <math.h>
 #include <numeric>
+
 #include <pppx/io.h>
 #include <pppx/const.h>
+#include <pppx/coord.h>
 #include <pppx/rinex.h>
+
+const size_t MINAC = 3;
 
 std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix,
@@ -55,18 +61,21 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
     combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
     combined_ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined_ac.name);
     combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
+    std::string sp3_file;
+    std::vector<std::string> sp3_files;
+    for (int i=0; i!=3; ++i) {
+        MJD t = config.mjd;
+        t.d += (i-1);
+        sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, combined_ac.name));
+    }
+
     if (config.use_att && !combined_ac.read_att(combined_ac.att_file))
-        fprintf(stderr, MSGWAR "use nominal attitude\n");
-    if (!combined_ac.read_orbit(combined_ac.sp3_file) ||
-        !combined_ac.open_clock(combined_ac.clk_file) ||
+        fprintf(stderr, MSG_WAR "use nominal attitude\n");
+    if (!combined_ac.read_orbit(sp3_files/*combined_ac.sp3_file*/) ||
         !combined_ac.open_atx(combined_ac.atx_file) ||
         (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
-        fprintf(stderr, MSG_ERR "no combined sp3 file: %s\n", combined_ac.sp3_file.c_str());
         return false;
     }
-    // combined_ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt());
-    // if (config.combine_staclk)
-    //     combined_ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
 
     // each AC
     for (auto it=config.ac_names.begin(); it!=config.ac_names.end(); ++it) {
@@ -75,23 +84,23 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
 
         fprintf(stderr, "%3s...\n", it->c_str());
 
-        // std::vector<std::string> sp3_files;
-        // for (int i=0; i!=3; ++i) {
-        //     MJD t = config.mjd;
-        //     t.d += (i-1);
-        //     sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, *it));
-        // }
+        sp3_files.clear();
+        for (int i=0; i!=3; ++i) {
+            MJD t = config.mjd;
+            t.d += (i-1);
+            sp3_file = config.product_path + replace_pattern(config.sp3_pattern, t, *it);
+            sp3_files.push_back(sp3_file);
+        }
         ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, *it);
         ac.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, *it);
         ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, *it);
         ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
         ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
         ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
-        if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
+        if (!ac.read_orbit(sp3_files/*ac.sp3_file*/) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
             || (config.use_att && !ac.read_att(ac.att_file))
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
             || !ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt())
-            || (config.combine_staclk && !ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx()))
             || (config.phase_clock && !ac.read_bias(ac.bia_file, config.prns, sats))) {
             acs.pop_back();
             fprintf(stderr, MSG_WAR "remove AC without products: %s\n", it->c_str());
@@ -99,7 +108,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
     }
 
     if (config.combine_staclk) {
-        std::map<std::string, int> sta_counts;
+        std::map<std::string, size_t> sta_counts;
         for (auto it=acs.begin(); it!=acs.end(); ++it)
         {
             auto sta_names = it->sta_names();
@@ -110,7 +119,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         }
         for (auto it=sta_counts.begin(); it!=sta_counts.end(); ++it)
         {
-            if (it->second < 3)
+            if (it->second < MINAC)
                 continue;
             config.sta_list.push_back(it->first);
         }
@@ -125,9 +134,17 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         printf("\n\n");
     }
 
+    // if (!combined_ac.open_clock(combined_ac.clk_file))
+    //     return false;
+    // combined_ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt());
+    if (config.combine_staclk) {
+        // combined_ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
+        for (auto it=acs.begin(); it!=acs.end(); ++it)
+            it->read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
+    }
 
     // Check whether we have enough ACs
-    if (acs.size() < 3u) {
+    if (acs.size() < MINAC) {
         fprintf(stderr, MSG_ERR "too few ACs: %lu\n", acs.size());
         return false;
     } else {
@@ -172,8 +189,8 @@ bool sat_obstp(const std::string &prn, std::string obstp[])
             obstp[3] = "C2W";
             break;
         case 'E':
-            obstp[0] = "L1X";
-            obstp[1] = "L5X";
+            obstp[0] = "L1X"; // L1C L1X
+            obstp[1] = "L5X"; // L5Q L5X
             obstp[2] = "C1X";
             obstp[3] = "C5X";
             break;
@@ -183,10 +200,6 @@ bool sat_obstp(const std::string &prn, std::string obstp[])
             obstp[2] = "C2I";
             obstp[3] = "C6I";
             break;
-        // case 'R':
-        //     f[0] = GLS_f1;
-        //     f[1] = GLS_f2;
-        //     break;
         // case 'J':
         default:
             fprintf(stderr, MSG_ERR "sat_obstp: unsupported system %c\n", prn[0]);
@@ -195,15 +208,59 @@ bool sat_obstp(const std::string &prn, std::string obstp[])
     return true;
 }
 
+enum GNSS_Tp prn2sys(const std::string &prn)
+{
+    enum GNSS_Tp tp;
+    int iprn;
+    switch (prn[0]) {
+    case 'G':
+        tp = _GPS_; break;
+    case 'R':
+        tp = _GLS_; break;
+    case 'E':
+        tp = _GAL_; break;
+    case 'C':
+        iprn = atoi(prn.c_str()+1);
+        tp = iprn > 16 ? _BD3_ : _BD2_;
+        break;
+    case 'J':
+        tp = _QZS_; break;
+    default:
+        tp = _UNKNOWN_;
+    }
+    return tp;
+}
+
+char sys2char(enum GNSS_Tp tp)
+{
+    switch (tp) {
+    case _GPS_:
+        return 'G';
+    case _GLS_:
+        return 'R';
+    case _GAL_:
+        return 'E';
+    case _BD2_:
+        return 'C';
+    case _BD3_:
+        // return 'C';
+        return 'B';
+    case _QZS_:
+        return 'J';
+    default:
+        return 'X';
+    }
+}
+
 bool init_sats(const config_t &config, std::vector<Satellite> &sats)
 {
     // RinexAtx rnxatx;
-    // if (!rnxatx.open(config.atx_path))
+    // if (!rnxatx.open(config.atx_pattern))
     //     return false;
 
     MJD t = config.mjd;
     t.sod = 43200;
-    // const RinexAtx::atx_t *atx = nullptr;
+    const RinexAtx::atx_t *atx = nullptr;
 
     sats.clear();
     for (auto it=config.prns.begin(); it!=config.prns.end(); ++it) {
@@ -220,9 +277,10 @@ bool init_sats(const config_t &config, std::vector<Satellite> &sats)
 
         // atx = rnxatx.atx(t, sat.prn);
         // if (nullptr != atx) {
-            // sat.svn = atx->svn();
+        //     sat.svn = atx->svn();
+        //     sat.blk = atx->blk();
         // } else {
-            // fprintf(stderr, MSG_WAR "init_sats: no SVN for %3s\n", sat.prn.c_str());
+        //     fprintf(stderr, MSG_WAR "init_sats: no SVN for %3s\n", sat.prn.c_str());
         // }
     }
     return true;
@@ -315,7 +373,7 @@ bool construct_init_staclk(const config_t &config,
                 if (it->sta_clks[ista][iepo] != None)
                     clks.push_back(it->sta_clks[ista][iepo]);
             }
-            if (clks.size() < 3)
+            if (clks.size() < MINAC)
                 comb_clks[ista].push_back(None);
             else
                 comb_clks[ista].push_back(median(clks));
@@ -769,7 +827,7 @@ void combine_one_epoch(const std::vector<double> &clks,
 
 double weighted_mean(const std::vector<double> &vals, const std::vector<double> &wgts, double &wrms)
 {
-    if (vals.size() < 2u)
+    if (vals.size() < MINAC)
         return None;
 
     double sum = 0, sum_wgt = 0;
@@ -892,7 +950,8 @@ void write_satclks_diff(FILE *fp, const config_t &config, const std::string &acn
 
 bool write_clkfile(const std::string &path, const config_t &config,
                    const std::vector<std::vector<double>> &satclks,
-                   const std::vector<std::vector<double>> &staclks)
+                   const std::vector<std::vector<double>> &staclks,
+                   const RinexSnx &rnxsnx)
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
@@ -957,7 +1016,12 @@ bool write_clkfile(const std::string &path, const config_t &config,
     if (config.combine_staclk) {
         fprintf(fp, "   %3lu %73s\n", valid_sites.size(), "# OF SOLN STA / TRF ");
         for (size_t i=0; i!=valid_sites.size(); ++i) {
-            fprintf(fp, "%4s %76s\n", valid_sites[i].c_str(), "SOLN STA NAME / NUM");
+            std::string dome;
+            CartCoor pos;
+            rnxsnx.find_dome(valid_sites[i], dome);
+            rnxsnx.find_pos(valid_sites[i], pos);
+            fprintf(fp, "%4s %9s          %12.0f%12.0f%12.0f%s\n", valid_sites[i].c_str(),
+                    dome.c_str(), pos.x*1E3, pos.y*1E3, pos.z*1E3, "SOLN STA NAME / NUM");
         }
     }
 
@@ -981,10 +1045,10 @@ bool write_clkfile(const std::string &path, const config_t &config,
 
         if (config.combine_staclk && i%ratio == 0) {
             for (size_t j=0; j!=nsta; ++j) {
-                if (staclks[j][i] == None)
+                if (staclks[j][i/ratio] == None)
                     continue;
                 fprintf(fp, "AR %4s %4d %02d %02d %02d %02d %9.6f  1 %21.12E\n",
-                        site_list[j].c_str(), y, m, d, h, min, s, staclks[j][i]);
+                        site_list[j].c_str(), y, m, d, h, min, s, staclks[j][i/ratio]);
             }
         }
 
