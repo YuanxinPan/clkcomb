@@ -430,7 +430,7 @@ bool align_widelane(const std::vector<Satellite> &sats,
     if (refsat == -1)
         return false;
 
-    std::vector<double> diff[nac]; // track change of WL
+    std::vector<std::vector<double>> diff(nac); // track change of WL
     // 1. coarse alignment
     for (auto it=acs.begin(); it!=acs.end(); ++it) {
         double d = acs[0].wl_bias[refsat] - it->wl_bias[refsat];

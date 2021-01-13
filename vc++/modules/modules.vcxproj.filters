@@ -1,0 +1,131 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="chrono">
+      <UniqueIdentifier>{95aad088-0612-47d8-8254-b98579034bb8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rinex">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="coord">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="io">
+      <UniqueIdentifier>{847d68aa-2c95-4093-89c5-738b8be6d2d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{4f0cb672-4928-44c5-868c-15200239a1b5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\modules\rinex\Ephemeris.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\rinex\RinexAtt.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\rinex\RinexAtx.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\rinex\RinexClk.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\rinex\RinexNav.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\rinex\RinexSnx.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\rinex\RinexSp3.cpp">
+      <Filter>rinex</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\chrono\chrono.cpp">
+      <Filter>chrono</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\chrono\Time.cpp">
+      <Filter>chrono</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\coord\CartCoor.cpp">
+      <Filter>coord</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\coord\coord.cpp">
+      <Filter>coord</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\coord\JplEph.cpp">
+      <Filter>coord</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\io\ini.cpp">
+      <Filter>io</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\io\io.cpp">
+      <Filter>io</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\modules\rinex\Ephemeris.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\rinex.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\RinexAtt.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\RinexAtx.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\RinexClk.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\RinexNav.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\RinexSnx.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\rinex\RinexSp3.h">
+      <Filter>rinex</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\chrono\chrono.h">
+      <Filter>chrono</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\chrono\Time.h">
+      <Filter>chrono</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\coord\CartCoor.h">
+      <Filter>coord</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\coord\coord.h">
+      <Filter>coord</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\coord\Ellipsoid.h">
+      <Filter>coord</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\coord\JplEph.h">
+      <Filter>coord</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\io\ini.h">
+      <Filter>io</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\modules\io\io.h">
+      <Filter>io</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\pppx\chrono.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\pppx\const.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\pppx\coord.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\pppx\io.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\pppx\rinex.h">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
