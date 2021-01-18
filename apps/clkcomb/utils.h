@@ -30,6 +30,7 @@ bool construct_init_staclk(const config_t &config,
 
 bool align_widelane(const std::vector<Satellite> &sats,
                     std::vector<AnalyseCenter> &acs,
+                    AnalyseCenter &combined_ac,
                     const std::vector<int> &prns);
 
 void count_satclks(const config_t &config,
@@ -47,12 +48,10 @@ void align_clock_datum(std::vector<std::vector<double>> &sat_clks,
 
 double satclk_std(const std::vector<double> &clks, const std::vector<double> &refs, double T);
 
-// void remove_clock_bias(const std::string &prn,
 void remove_clock_bias(const std::string &name, const Satellite &sat,
                        std::vector<double> &sat_clks,
                        const std::vector<double> &ref_clks,
-                       bool phase_clock,
-                       double &std, bool edit);
+                       bool phase_clock, double &std, bool edit);
 
 void combine_one_epoch(const std::vector<double> &clks,
                        const std::vector<double> &wgts,
@@ -63,9 +62,10 @@ void combine_one_epoch(const std::vector<double> &clks,
 void write_satclks(FILE *fp, const config_t &config, const std::string &acn,
                    const std::vector<std::vector<double>> &sat_clks);
 
-void write_satclks_diff(FILE *fp, const config_t &config, const std::string &acn,
-                   const std::vector<std::vector<double>> &sat_clks,
-                   const std::vector<std::vector<double>> &ref_clks);
+void write_satclks_diff(FILE *fp, const config_t &config,
+                        const std::string &prefix, const std::string &acn,
+                        const std::vector<std::vector<double>> &sat_clks,
+                        const std::vector<std::vector<double>> &ref_clks);
 
 void compare_satclks(const config_t &config, const std::string &name,
                      const std::vector<std::vector<double>> &sat_clks,
@@ -84,7 +84,10 @@ bool write_clkfile(const std::string &path, const config_t &config,
 
 bool write_bias(const std::string &path, MJD t,
                 const std::vector<Satellite> &sats,
+                const std::vector<int> &have_bias,
                 const std::vector<double> &wl_bias);
+
+double stable_mean(const std::vector<double> &v);
 
 double weighted_mean(const std::vector<double> &vals, const std::vector<double> &wgts, double &wrms);
 

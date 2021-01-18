@@ -1,10 +1,10 @@
 #include "RinexAtt.h"
 #include "../io/io.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-// #include <cctype>
 #include <algorithm>
 #include <pppx/const.h>
 

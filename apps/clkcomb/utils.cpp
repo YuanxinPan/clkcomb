@@ -71,7 +71,8 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
 
     if (config.use_att && !combined_ac.read_att(combined_ac.att_file))
         fprintf(stderr, MSG_WAR "use nominal attitude\n");
-    if (!combined_ac.read_orbit(sp3_files/*combined_ac.sp3_file*/) ||
+    // if (!combined_ac.read_orbit(sp3_files/*combined_ac.sp3_file*/) ||
+    if (!combined_ac.read_orbit(combined_ac.sp3_file) ||
         !combined_ac.open_atx(combined_ac.atx_file) ||
         (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
         return false;
@@ -97,7 +98,8 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
         ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
         ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
-        if (!ac.read_orbit(sp3_files/*ac.sp3_file*/) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
+        // if (!ac.read_orbit(sp3_files/*ac.sp3_file*/) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
+        if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
             || (config.use_att && !ac.read_att(ac.att_file))
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
             || !ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt())
@@ -410,6 +412,7 @@ void detect_outlier(const std::vector<double> &vals,
 
 bool align_widelane(const std::vector<Satellite> &sats,
                     std::vector<AnalyseCenter> &acs,
+                    AnalyseCenter &combined_ac,
                     const std::vector<int> &prns)
 {
     size_t nsat = prns.size();
@@ -444,8 +447,8 @@ bool align_widelane(const std::vector<Satellite> &sats,
     // 2. adjust WL to (-0.5, 0.5)
     for (auto i=prns.begin(); i!=prns.end(); ++i) {
         for (size_t j=0; j!=nac; ++j) {
-            // if (!acs[j].have_bias[*i])
-            //     continue;
+            if (!acs[j].have_bias[*i])
+                continue;
             while (acs[j].wl_bias[*i] > 0.5) {
                 acs[j].wl_bias[*i] -= 1;
                 diff[j][i-prns.begin()] -= 1;
@@ -457,14 +460,23 @@ bool align_widelane(const std::vector<Satellite> &sats,
         }
 
         // check for WL cluster at two ends
-        bool pos = false, neg = false;
-        for (size_t j=0; j!=nac; ++j) {
-            if (acs[j].wl_bias[*i] >  0.4) pos=true;
-            if (acs[j].wl_bias[*i] < -0.4) neg=true;
+        std::vector<double> bias;
+        for (size_t j=0; j!=nac; ++j)
+            if (acs[j].have_bias[*i])
+                bias.push_back(acs[j].wl_bias[*i]);
+
+        if (bias.size() < MINAC) {
+            combined_ac.have_bias[*i] = 0;
+            combined_ac.wl_bias[*i] = None;
+            continue;
         }
-        if (pos && neg) {
+        double max = *std::max_element(bias.begin(), bias.end());
+        double min = *std::min_element(bias.begin(), bias.end());
+        if (max - min > 0.6) {
             for (size_t j=0; j!=nac; ++j) {
-                if (acs[j].wl_bias[*i] < -0.40) {
+                if (!acs[j].have_bias[*i])
+                    continue;
+                if (max - acs[j].wl_bias[*i] > 0.6) {
                     acs[j].wl_bias[*i] += 1;
                     diff[j][i-prns.begin()] += 1;
                 }
@@ -472,7 +484,56 @@ bool align_widelane(const std::vector<Satellite> &sats,
         }
     }
 
-    // 3. mean WL
+    // 3. adjust NL
+    for (size_t i=0; i!=nac; ++i) {
+        for (auto j=prns.begin(); j!=prns.end(); ++j) {
+            if (!acs[i].have_bias[*j])
+                continue;
+            double coef = sats[*j].f[1]/(sats[*j].f[0] - sats[*j].f[1]);
+            acs[i].nl_bias[*j] += coef*diff[i][j-prns.begin()];
+        }
+    }
+
+    // align mean-WL
+    int nhave_bias = 0;
+    for (auto iprn=prns.begin(); iprn!=prns.end(); ++iprn)
+    {
+        size_t count = 0;
+        for (auto iac=acs.begin(); iac!=acs.end(); ++iac) {
+            if (iac->have_bias[*iprn])
+                ++count;
+        }
+        if (count == nac) {
+            combined_ac.have_bias[*iprn] = 1;
+            ++nhave_bias;
+        }
+    }
+
+    bool first = true;
+    double mean = 0;
+    for (auto it=acs.begin(); it!=acs.end(); ++it)
+    {
+        double sum = 0;
+        for (auto j=prns.begin(); j!=prns.end(); ++j) {
+            if (combined_ac.have_bias[*j])
+                sum += it->wl_bias[*j];
+        }
+        sum /= nhave_bias;
+        // fprintf(stderr, "%3s %8.4f\n", it->name.c_str(), sum);
+
+        if (first) {
+            mean = sum;
+            first = false;
+        } else {
+            double diff = mean - sum;
+            for (auto j=prns.begin(); j!=prns.end(); ++j) {
+                if (it->have_bias[*j])
+                    it->wl_bias[*j] += diff;
+            }
+        }
+    }
+
+    // 4. mean WL
     for (auto i=prns.begin(); i!=prns.end(); ++i)
     {
         printf("%3s WL ", sats[*i].prn.c_str());
@@ -480,10 +541,14 @@ bool align_widelane(const std::vector<Satellite> &sats,
         std::vector<double> vals;
         std::vector<double> wgts;
         for (auto it=acs.begin(); it!=acs.end(); ++it) {
-            if (!it->have_bias[*i])
+            if (!it->have_bias[*i]) {
+                printf(" %7s", "");
                 continue;
+            }
             printf(" %7.3f", it->wl_bias[*i]);
             // sum += it->wl_bias[*i];
+            if (it->name == "gbm") // gbm/esa only one
+                continue;
             vals.push_back(it->wl_bias[*i]);
             wgts.push_back(1.0);
         }
@@ -500,22 +565,12 @@ bool align_widelane(const std::vector<Satellite> &sats,
         double mean = weighted_mean(vals, wgts, wrms);
         printf(" %7.3f\n", mean);
 
-        for (size_t j=0; j!=nac; ++j) {
-            if (!acs[j].have_bias[*i])
-                continue;
-            double d = mean - acs[j].wl_bias[*i];
-            acs[j].wl_bias[*i] += d;
-            // diff[j][i-prns.begin()] += d;
-        }
-    }
-
-    // 4. adjust NL
-    for (size_t i=0; i!=nac; ++i) {
-        for (auto j=prns.begin(); j!=prns.end(); ++j) {
-            if (!acs[i].have_bias[*j])
-                continue;
-            double coef = sats[*j].f[1]/(sats[*j].f[0] - sats[*j].f[1]);
-            acs[i].nl_bias[*j] += coef*diff[i][j-prns.begin()];
+        if (mean == None) {
+            combined_ac.have_bias[*i] = 0;
+            combined_ac.wl_bias[*i] = None;
+        } else {
+            combined_ac.have_bias[*i] = 1;
+            combined_ac.wl_bias[*i] = mean;
         }
     }
 
@@ -569,12 +624,15 @@ void align_clock_datum(std::vector<std::vector<double>> &sat_clks,
     size_t ncommon = common_prns.size();
     for (size_t epo=0; epo!=nepo_total; ++epo)
     {
+        // std::vector<double> diff;
         double sum[2] = { 0, 0 };
         for (auto it=common_prns.cbegin(); it!=common_prns.cend(); ++it) {
             sum[0] += ref_clks[*it][epo];
             sum[1] += sat_clks[*it][epo];
+            // diff.push_back(sat_clks[*it][epo] - ref_clks[*it][epo]);
         }
         double mean = (sum[1] - sum[0])/ncommon;
+        // double mean = stable_mean(diff);
 
         for (auto it=adjust_prns.cbegin(); it!=adjust_prns.cend(); ++it)
             if (sat_clks[*it][epo] != None)
@@ -716,7 +774,6 @@ void remove_clkbias_seg(const std::string &name, const std::string &prn,
     }
 }
 
-// void remove_clock_bias(const std::string &prn,
 void remove_clock_bias(const std::string &name, const Satellite &sat,
                        std::vector<double> &sat_clks,
                        const std::vector<double> &ref_clks,
@@ -931,7 +988,8 @@ void write_satclks(FILE *fp, const config_t &config, const std::string &acn,
     }
 }
 
-void write_satclks_diff(FILE *fp, const config_t &config, const std::string &acn,
+void write_satclks_diff(FILE *fp, const config_t &config,
+                        const std::string &prefix, const std::string &acn,
                         const std::vector<std::vector<double>> &sat_clks,
                         const std::vector<std::vector<double>> &ref_clks)
 {
@@ -941,7 +999,7 @@ void write_satclks_diff(FILE *fp, const config_t &config, const std::string &acn
         // fprintf(stderr, "%3s %2lu %3s %6lu %6lu\n", acn.c_str(), prn, config.prns[prn].c_str(), sat_clks[prn].size(), ref_clks[prn].size());
         for (size_t epo=0; epo!=nepo_total; ++epo) {
             if (sat_clks[prn][epo]!=None && ref_clks[prn][epo]!=None)
-                fprintf(fp, "%4lu %3s %3s %16.3f\n", epo, acn.c_str(),
+                fprintf(fp, "%3s %4lu %3s %3s %16.3f\n", prefix.c_str(), epo, acn.c_str(),
                         config.prns[prn].c_str(), sat_clks[prn][epo] - ref_clks[prn][epo]);
         }
     }
@@ -1082,6 +1140,7 @@ static void convert2raw_bias(double wl, const double f[], double raw[])
 
 bool write_bias(const std::string &path, MJD t,
                 const std::vector<Satellite> &sats,
+                const std::vector<int> &have_bias,
                 const std::vector<double> &wl_bias)
 {
     FILE *fp = fopen(path.c_str(), "w");
@@ -1100,6 +1159,8 @@ bool write_bias(const std::string &path, MJD t,
     // const char *types[4] = { "L1C", "L2W", "C1W", "C2W" };
     mjd2doy(t.d, &y, &doy);
     for (size_t i=0; i!=nsat; ++i) {
+        if (!have_bias[i])
+            continue;
         convert2raw_bias(wl_bias[i], sats[i].f, raw);
         for (int j=0; j!=4; ++j)
             fprintf(fp, " OSB  %4s %3s %9s %-4s %-4s %4d:%03d:%05d %4d:%03d:%05d %-4s %21.3f %11.3f\n",
@@ -1126,6 +1187,23 @@ double median(const std::vector<double> &vals)
     } else {
         return v[s/2];
     }
+}
+
+double stable_mean(const std::vector<double> &vals)
+{
+    // std::vector<double> vals(v);
+    std::vector<double> wgts(vals.size(), 1.0);
+    std::vector<int> deleted;
+    detect_outlier(vals, wgts, deleted);
+    if (!deleted.empty()) {
+        for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
+            // vals[*it] = 0;
+            wgts[*it] = 0;
+        }
+    }
+    double wrms;
+    double mean = weighted_mean(vals, wgts, wrms);
+    return mean;
 }
 
 void unit_weight(std::vector<double> &wgts)
