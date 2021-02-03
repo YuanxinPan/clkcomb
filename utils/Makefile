@@ -2,7 +2,7 @@ DIR_GUARD = @mkdir -p $(@D)
 BIN_PATH = ../bin/
 OBJ_PATH = ../bin/obj/utils/
 
-EXE := fip2snx grg2snx sgg2snx
+EXE := fip2snx grg2snx sgg2snx zqy2snx
 TARGET := $(addprefix $(BIN_PATH), $(EXE))
 all : $(TARGET)
 
@@ -27,6 +27,9 @@ $(BIN_PATH)grg2snx : $(OBJ_PATH)grg2snx.o
 	$(CC) $(CPPFALGS) $(DEBUG) $< -o $@
 
 $(BIN_PATH)sgg2snx : $(OBJ_PATH)sgg2snx.o
+	$(CC) $(CPPFALGS) $(DEBUG) $< -o $@
+
+$(BIN_PATH)zqy2snx : $(OBJ_PATH)zqy2snx.o
 	$(CC) $(CPPFALGS) $(DEBUG) $< -o $@
 
 .PHONY : clean

@@ -114,7 +114,7 @@ bool AnalyseCenter::read_clock(const config_t &config, const RinexSp3 &refsp3,
     }
 
     rnxclk_.close();
-    rnxatx_.close();
+    if (!config.phase_clock) rnxatx_.close();
     if (config.use_att) rnxatt_.close();
     return true;
 }
@@ -267,16 +267,41 @@ bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::st
     for (size_t isat=0; isat!=nsat_total; ++isat)
     {
         int count=0;
-        double sum=0;
+        double sum=0, nlsum=0;
         for (size_t iepo=0; iepo!=nepo_total; ++iepo) {
             if (wls[isat][iepo]==0.0 && nls[isat][iepo]==0.0)
                 continue;
             sum += wls[isat][iepo];
+            nlsum += nls[isat][iepo];
             ++count;
         }
         if (count != 0) {
             wl_bias[isat] = sum/count;
+            // nl_bias[isat] = nlsum/count;
             have_bias[isat] = 1;
+        }
+
+        if (count != 0 && name == "tug") {
+            const RinexAtx::atx_t *atx = rnxatx_.atx(mjd, prns[isat]);
+            if (atx == nullptr)
+                continue;
+            std::string f1, f2;
+            switch (prns[isat][0]) {
+                case 'G': f1 = "G01"; f2 = "G02"; break;
+                case 'E': f1 = "E01"; f2 = "E05"; break;
+                case 'C': f1 = "C02"; f2 = "C06"; break;
+            }
+            double pco[2][3];
+            atx->pco(f1, pco[0]);
+            atx->pco(f2, pco[1]);
+            const double *f = sats[isat].f;
+            double lamd[3] = { LightSpeed/f[0], LightSpeed/f[1], LightSpeed/(f[0]-f[1]) };
+            double coef[2] = { f[0]/(f[0]+f[1]), f[1]/(f[0]+f[1]) };
+            double cor = pco[0][2]/lamd[0] - pco[1][2]/lamd[1] - (pco[0][2]*coef[0] + pco[1][2]*coef[1])/lamd[2];
+            int integer = static_cast<int>(cor);
+            double wcor = cor - integer;
+            fprintf(stdout, "PCO %3s %8.3f %8.3f\n", prns[isat].c_str(), cor, wcor);
+            wl_bias[isat] -= wcor;
         }
     }
 
@@ -289,6 +314,7 @@ bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::st
     }
 
     fclose(fp);
+    rnxatx_.close();
     return true;
 }
 

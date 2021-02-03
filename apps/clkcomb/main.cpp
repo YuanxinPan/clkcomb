@@ -299,7 +299,7 @@ int main(int argc, char *argv[])
 
                 double max = *std::max_element(bias.begin(), bias.end());
                 for (auto it=bias.begin(); it!=bias.end(); ++it)
-                    if (max - *it > 0.6)
+                    if (max - *it > 0.75)
                         *it += 1;
                 double cycle = stable_mean(bias);
                 // double cycle = std::accumulate(bias.begin(), bias.end(), 0.0)/bias.size();

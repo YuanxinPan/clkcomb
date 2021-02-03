@@ -31,9 +31,15 @@ void qinv(const double *q, double *qi)
 
 int main(int argc, char *argv[])
 {
+    if (argc == 1) {
+        fprintf(stdout, "att srcatt refatt sp3 mjd prn\n");
+        return 0;
+    }
+
     RinexAtt srcatt;
     RinexAtt refatt;
     RinexSp3 rnxsp3;
+
     if (!srcatt.read(argv[1]) )
         return 1;
 
@@ -86,10 +92,6 @@ int main(int argc, char *argv[])
             qcross(qi, qn, qc);
         diff[1] = 2*atan2(qc[3], qc[0])*R2D;
 
-    //     // (1)
-    //     // diff[1] = q_diff(qs, qr)*R2D;
-
-    //     // (2)
     //     qinv(qs, qi);
     //     qcross(qi, qr, qc);
     //     // norm = sqrt(dot(qc+1, qc+1));
@@ -102,9 +104,9 @@ int main(int argc, char *argv[])
             diff[1] += 360;
         }
 
-    //     double pwd = diff[1]/360*1E12/(GPS_f1 + GPS_f2);
-
-    //     fprintf(stdout, "%8.0f %8.3f %8.3f\n", t.sod, diff[1], pwd);
+    //     double pwu = diff[1]/360*1E12/(GPS_f1 + GPS_f2);
+    //     fprintf(stdout, "%8.0f %8.3f %8.3f\n", t.sod, diff[1], pwu);
+    //
         diff[0] = diff[1];
         printf("%4d %8.3f\n", iepo, diff[1]);
     }

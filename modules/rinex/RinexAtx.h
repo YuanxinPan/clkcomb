@@ -27,6 +27,7 @@ public:
         mutable double R_[9];    // rotation matrix: spacecraft to ecef
 
     public:
+        bool pco(const std::string &f, double *pco)const;
         void pco(double *pco, const std::string &f1, const std::string &f2)const;
         void pco(const double *xsat, const double *vsat, const double *xsun, double *pco, double *R=nullptr)const;
         double pcv(double zen, double azi)const;

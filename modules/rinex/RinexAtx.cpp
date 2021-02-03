@@ -9,6 +9,20 @@
 #include <Eigen/Dense>
 #include <pppx/const.h>
 
+bool RinexAtx::atx_t::pco(const std::string &f, double *pco)const
+{
+    auto it = std::find(freq.begin(), freq.end(), f);
+    int i = it - freq.begin();
+    if (it == freq.end())
+        return false;
+
+    memcpy(pco, pcos[i].data(), 3*sizeof(double));
+    // pco[0] = pcos[i][0];
+    // pco[1] = pcos[i][1];
+    // pco[2] = pcos[i][2];
+    return true;
+}
+
 void RinexAtx::atx_t::pco(double *pco, const std::string &f1, const std::string &f2)const
 {
     double f[2] = { 0, 0 };
@@ -257,9 +271,10 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)const
             // check whether required
             if (atx.name != ant)
                 skip_atx(atxFile_);
-            else if (issatatx)
+            else if (issatatx) {
                 atx.svn_.assign(buf+40, 4);
                 atx.blk_.assign(buf, 12);
+            }
         }
         else if (strncmp(buf+60, "DAZI", 4) == 0)
             sscanf(buf, "%lf", &atx.dazi);

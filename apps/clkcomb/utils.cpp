@@ -472,11 +472,11 @@ bool align_widelane(const std::vector<Satellite> &sats,
         }
         double max = *std::max_element(bias.begin(), bias.end());
         double min = *std::min_element(bias.begin(), bias.end());
-        if (max - min > 0.6) {
+        if (max - min > 0.75) {
             for (size_t j=0; j!=nac; ++j) {
                 if (!acs[j].have_bias[*i])
                     continue;
-                if (max - acs[j].wl_bias[*i] > 0.6) {
+                if (max - acs[j].wl_bias[*i] > 0.75) {
                     acs[j].wl_bias[*i] += 1;
                     diff[j][i-prns.begin()] += 1;
                 }
@@ -539,7 +539,6 @@ bool align_widelane(const std::vector<Satellite> &sats,
         printf("%3s WL ", sats[*i].prn.c_str());
         // double sum = 0;
         std::vector<double> vals;
-        std::vector<double> wgts;
         for (auto it=acs.begin(); it!=acs.end(); ++it) {
             if (!it->have_bias[*i]) {
                 printf(" %7s", "");
@@ -550,19 +549,9 @@ bool align_widelane(const std::vector<Satellite> &sats,
             if (it->name == "gbm") // gbm/esa only one
                 continue;
             vals.push_back(it->wl_bias[*i]);
-            wgts.push_back(1.0);
         }
         // double mean = sum/nac;
-        std::vector<int> deleted;
-        detect_outlier(vals, wgts, deleted);
-        if (!deleted.empty()) {
-            for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
-                vals[*it] = 0;
-                wgts[*it] = 0;
-            }
-        }
-        double wrms;
-        double mean = weighted_mean(vals, wgts, wrms);
+        double mean = stable_mean(vals);
         printf(" %7.3f\n", mean);
 
         if (mean == None) {
@@ -665,7 +654,8 @@ double satclk_std(const std::vector<double> &clks, const std::vector<double> &re
 }
 
 static void remove_bias_seg(int beg, int end, std::vector<double> &biass,
-                            std::vector<int> index, std::vector<double> &sat_clks, bool phase_clock)
+                            std::vector<int> index, std::vector<double> &sat_clks,
+                            const Satellite &sat, bool phase_clock)
 {
     if (biass.empty())
         return;
@@ -697,7 +687,7 @@ static void remove_bias_seg(int beg, int end, std::vector<double> &biass,
     // Bias & standard-deviation
     double bias = std::accumulate(diffs.begin(), diffs.end(), 0.0)/count;
     if (phase_clock) {
-        double T = 1E9/(GPS_f1 + GPS_f2);
+        double T = 1E9/(sat.f[0] + sat.f[1]);
         bias = floor(bias/T + 0.5)*T;
     }
     double sum = 0;
@@ -723,7 +713,7 @@ static void remove_bias_seg(int beg, int end, std::vector<double> &biass,
     }
 }
 
-void remove_clkbias_seg(const std::string &name, const std::string &prn,
+void remove_clkbias_seg(const std::string &name, const Satellite &sat,
                        std::vector<double> &sat_clks, const std::vector<double> &ref_clks, bool phase_clock)
 {
     // Collect bias of each valid epoch
@@ -769,7 +759,7 @@ void remove_clkbias_seg(const std::string &name, const std::string &prn,
 
     int beg = 0;
     for (auto it=segs.begin(); it!=segs.end(); ++it) {
-        remove_bias_seg(beg, *it, biass, id, sat_clks, phase_clock);
+        remove_bias_seg(beg, *it, biass, id, sat_clks, sat, phase_clock);
         beg = *it;
     }
 }
@@ -781,7 +771,7 @@ void remove_clock_bias(const std::string &name, const Satellite &sat,
 {
     // if (!edit && !phase_clock) {
     if (!edit) {
-        remove_clkbias_seg(name, sat.prn, sat_clks, ref_clks, phase_clock);
+        remove_clkbias_seg(name, sat, sat_clks, ref_clks, phase_clock);
         return;
     }
 
@@ -1059,7 +1049,7 @@ bool write_clkfile(const std::string &path, const config_t &config,
     int init_leapsec = 21;
     std::vector<int> leap_mjds = { 45150, 45515, 46246, 47160, 47891, 48256, 48803,
                                    49168, 49533, 50082, 50629, 51178, 53735, 54831,
-                                   56108, 57203, 57753, 59214 };
+                                   56108, 57203, 57753, 59395 };
     auto it = std::lower_bound(leap_mjds.begin(), leap_mjds.end(), t.d);
     if (it == leap_mjds.end()) {
         fprintf(stderr, MSG_ERR "write_clkfile: %d out of leap_mjds range [%d, %d]\n", t.d, leap_mjds.front(), leap_mjds.back());
