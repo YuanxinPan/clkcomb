@@ -67,6 +67,7 @@ private:
 
 public:
     std::string name;
+    double weight;
     std::string att_file;
     std::string atx_file;
     std::string clk_file;

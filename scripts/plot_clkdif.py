@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import sys
 import math
 import warnings
@@ -34,6 +34,13 @@ for ac in ACs:
     if clkdel.size != 0:
         ax.plot(clkdel, clkdif[clkdel,1], 'x', color='k', markersize=4)
 
+ax.text(100, -0.25, prn, fontsize=14)
+ax.set_xlim([-120, 3000])
+ax.set_ylim([-0.3, 0.3])
+ax.set_xlabel('Epoch')
+ax.set_ylabel("Clock difference w.r.t. ref AC (ns)")
+plt.legend()
+
 # frame width
 bwidth=1.5
 ax.spines['bottom'].set_linewidth(bwidth)
@@ -49,14 +56,6 @@ ax.tick_params(axis='both', labelsize=10)
 ax.tick_params(axis='both', pad=4)
 ax.xaxis.label.set_size(12)
 ax.yaxis.label.set_size(12)
-
-ax.set_xlim([-120, 3000])
-ax.set_ylim([-0.3, 0.3])
-        
-ax.set_xlabel('Epoch')
-ax.set_ylim([-0.3, 0.3])
-ax.set_ylabel("Clock difference w.r.t. ref AC (ns)")
-plt.legend()
 
 plt.savefig(prn + '.png', pad_inches=0.01, bbox_inches='tight')
 # plt.show()

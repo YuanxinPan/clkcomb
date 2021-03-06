@@ -88,7 +88,7 @@ void compare_clks(const std::vector<std::string> &name_list,
                      const std::string &ac_name,
                      const std::vector<std::vector<double>> &src_clks,
                      const std::vector<std::vector<double>> &ref_clks,
-                     std::vector<double> &rmss,
+                     std::vector<double> &biass,
                      std::vector<double> &stds,
                      bool epoch_output);
 

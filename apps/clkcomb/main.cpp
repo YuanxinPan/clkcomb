@@ -355,8 +355,10 @@ int main(int argc, char *argv[])
                 wgt_sum += wgt;
                 clk_wgts[iac].assign(nsat_total, wgt);
             }
-            for (size_t iac=0; iac!=nac_total; ++iac)
+            for (size_t iac=0; iac!=nac_total; ++iac) {
                 fprintf(stderr, "    weight: %3s %6.2f%%\n", acs[iac].name.c_str(), 100*clk_wgts[iac][0]/wgt_sum);
+                acs[iac].weight = clk_wgts[iac][0]/wgt_sum;
+            }
         } else { // ouput satellite weight
             for (size_t iprn=0; iprn!=nsat_total; ++iprn) {
                 fprintf(stderr, "    weight: %3s", config.prns[iprn].c_str());
@@ -393,7 +395,7 @@ int main(int argc, char *argv[])
 
                 // remove outliers
                 for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
-                    fprintf(g_logfile, "del %2d %3s %3s %4lu\n", niter, acs[ac_indexs[*it]].name.c_str(), config.prns[iprn].c_str(), epo);
+                    fprintf(g_logfile, "del %2d %3s %4s %4lu\n", niter, acs[ac_indexs[*it]].name.c_str(), config.prns[iprn].c_str(), epo);
                     acs[ac_indexs[*it]].sat_clks[iprn][epo] = None;
                 }
             }
