@@ -8,7 +8,6 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <pppx/const.h>
 
 std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix=std::string(),
@@ -22,7 +21,8 @@ bool init_sats(const config_t &config, std::vector<Satellite> &sats);
 bool construct_initclk(const config_t &config,
                        const std::vector<AnalyseCenter> &acs,
                        const std::vector<Satellite> &sats,
-                       std::vector<std::vector<double>> &comb_clks);
+                       std::vector<std::vector<double>> &comb_clks,
+                       int &refac);
 
 bool construct_init_staclk(const config_t &config,
                            const std::vector<AnalyseCenter> &acs,
@@ -46,9 +46,16 @@ void align_clock_datum(std::vector<std::vector<double>> &sat_clks,
                        const std::vector<int> &adjust_prns,
                        const std::vector<int> &common_prns);
 
+void align_clock_datum2(std::vector<std::vector<double>> &sat_clks,
+                        std::vector<std::vector<double>> &ref_clks,
+                        const std::vector<int> &adjust_prns,
+                        const std::vector<int> &common_prns,
+                        std::vector<std::vector<double>> &sta_clks, int sample_ratio);
+
 double satclk_std(const std::vector<double> &clks, const std::vector<double> &refs, double T);
 
-void remove_clock_bias(const std::string &name, const Satellite &sat,
+void remove_clock_bias(const std::string &ac_name,
+                       const Satellite &sat, const int niter,
                        std::vector<double> &sat_clks,
                        const std::vector<double> &ref_clks,
                        bool phase_clock, double &std, bool edit);
@@ -62,19 +69,27 @@ void combine_one_epoch(const std::vector<double> &clks,
 void write_satclks(FILE *fp, const config_t &config, const std::string &acn,
                    const std::vector<std::vector<double>> &sat_clks);
 
-void write_satclks_diff(FILE *fp, const config_t &config,
-                        const std::string &prefix, const std::string &acn,
-                        const std::vector<std::vector<double>> &sat_clks,
-                        const std::vector<std::vector<double>> &ref_clks);
+void write_clks_diff(FILE *fp, const std::vector<std::string> &name_list,
+                     const std::string &prefix, const std::string &acn,
+                     const std::vector<std::vector<double>> &src_clks,
+                     const std::vector<std::vector<double>> &ref_clks);
 
-void compare_satclks(const config_t &config, const std::string &name,
-                     const std::vector<std::vector<double>> &sat_clks,
-                     const std::vector<std::vector<double>> &ref_clks,
-                     bool epoch_output);
+bool write_fip(const std::string &path, MJD t,
+               const std::vector<Satellite> &sats,
+               const std::vector<double> &wl_bias,
+               const std::vector<double> &nl_bias);
 
-void compare_staclks(const config_t &config, const std::string &name,
-                     const std::vector<std::vector<double>> &sat_clks,
+void write_clock_datum(const std::vector<std::string> &prns,
+                       char sys, const std::string &acn,
+                       const std::vector<std::vector<double>> &sat_clks,
+                       const std::vector<int> &common_prns);
+
+void compare_clks(const std::vector<std::string> &name_list,
+                     const std::string &ac_name,
+                     const std::vector<std::vector<double>> &src_clks,
                      const std::vector<std::vector<double>> &ref_clks,
+                     std::vector<double> &rmss,
+                     std::vector<double> &stds,
                      bool epoch_output);
 
 bool write_clkfile(const std::string &path, const config_t &config,
@@ -86,6 +101,16 @@ bool write_bias(const std::string &path, MJD t,
                 const std::vector<Satellite> &sats,
                 const std::vector<int> &have_bias,
                 const std::vector<double> &wl_bias);
+
+bool write_att(const std::string &path, const config_t &config, const RinexAtt &rnxatt);
+
+void clkfit(std::vector<double> clks, const int n, double &offset, double &drift);
+
+bool write_summary(const std::string &path, config_t &config,
+                   const std::vector<AnalyseCenter> &acs,
+                   const std::vector<Satellite> &sats,
+                   std::vector<std::vector<double>> &comb_clks,
+                   std::vector<std::vector<double>> &comb_staclks);
 
 double stable_mean(const std::vector<double> &v);
 

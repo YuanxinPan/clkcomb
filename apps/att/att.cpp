@@ -1,6 +1,6 @@
-#include <pppx/const.h>
-#include <pppx/rinex.h>
-#include <pppx/coord.h>
+#include <const.h>
+#include <rinex/rinex.h>
+#include <coord/coord.h>
 #include <math.h>
 
 double q_diff(const double *q1, const double*q2)

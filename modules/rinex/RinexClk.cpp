@@ -1,12 +1,12 @@
 #include "RinexClk.h"
 #include "../io/io.h"
+#include "../const.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <cctype>
 #include <algorithm>
-#include <pppx/const.h>
 
 void RinexClk::close()
 {

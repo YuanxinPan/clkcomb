@@ -4,8 +4,8 @@
 #include <vector>
 #include <string>
 
-#include <pppx/const.h>
-#include <pppx/chrono.h>
+#include <const.h>
+#include <chrono/chrono.h>
 
 typedef struct TAGCONFIG
 {
@@ -50,6 +50,10 @@ typedef struct TAGCONFIG
 
     // output
     bool align_brdc = false;
+    std::string product_prefix;
+    std::string cls_pattern; // summary file
+    std::string dif_pattern; // clock diff
+    std::string log_pattern; // log file
 
 } config_t;
 

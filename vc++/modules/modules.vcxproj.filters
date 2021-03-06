@@ -15,9 +15,6 @@
     <Filter Include="io">
       <UniqueIdentifier>{847d68aa-2c95-4093-89c5-738b8be6d2d1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include">
-      <UniqueIdentifier>{4f0cb672-4928-44c5-868c-15200239a1b5}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\modules\rinex\Ephemeris.cpp">
@@ -111,21 +108,6 @@
     </ClInclude>
     <ClInclude Include="..\..\modules\io\io.h">
       <Filter>io</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\pppx\chrono.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\pppx\const.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\pppx\coord.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\pppx\io.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\pppx\rinex.h">
-      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

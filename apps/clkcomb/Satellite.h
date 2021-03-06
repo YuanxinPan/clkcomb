@@ -2,7 +2,7 @@
 #define SATELLITE_H
 
 #include <string>
-#include <pppx/const.h>
+#include <const.h>
 
 class Satellite
 {

@@ -8,7 +8,7 @@ TARGET := $(addprefix $(BIN_PATH), $(MODULE))
 all : $(TARGET)
 
 CC = g++
-CPPFALGS = -Wall -g -O3 -I../include/ -std=c++11
+CPPFALGS = -Wall -g -O3 -I../modules/ -std=c++11
 DEBUG = 
 LIB = $(BIN_PATH)libmods.a
 

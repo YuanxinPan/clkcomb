@@ -13,8 +13,8 @@
 #include <iterator>
 #include <algorithm>
 
-#include <pppx/io.h>
-#include <pppx/const.h>
+#include <io/io.h>
+#include <const.h>
 
 static void print_prns(FILE *fp, const std::vector<std::string> &prns)
 {
@@ -131,6 +131,14 @@ static int handler(void* user, const char* section, const char* name, const char
         std::string v(value);
         if (v=="True" || v=="true")
             pconfig->align_brdc = true;
+    } else if (MATCH("output", "product prefix")) {
+        pconfig->product_prefix.assign(value);
+    } else if (MATCH("output", "cls pattern")) {
+        pconfig->cls_pattern.assign(value);
+    } else if (MATCH("output", "dif pattern")) {
+        pconfig->dif_pattern.assign(value);
+    } else if (MATCH("output", "log pattern")) {
+        pconfig->log_pattern.assign(value);
     } else {
         //return 0;  /* unknown section/name, error */
     }
@@ -187,6 +195,18 @@ static bool check_config(const config_t &config)
         return false;
     } else if (config.atx_pattern.empty()) {
         fprintf(stderr, MSG_ERR "check_config: [table] atx pattern not set\n");
+        return false;
+    } else if (config.product_prefix.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [output] product prefix not set\n");
+        return false;
+    } else if (config.cls_pattern.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [output] cls pattern not set\n");
+        return false;
+    } else if (config.dif_pattern.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [output] dif pattern not set\n");
+        return false;
+    } else if (config.log_pattern.empty()) {
+        fprintf(stderr, MSG_ERR "check_config: [output] log pattern not set\n");
         return false;
     } else {
         return true;
@@ -272,8 +292,9 @@ void print_config(FILE *fp, const config_t &config)
     mjd2wksow(config.mjd.d, config.mjd.sod, week, sow);
     int dow = static_cast<int>(sow/86400);
 
+    fprintf(fp, "===============start of config===============\n");
     fprintf(fp, "[session]\n");
-    fprintf(fp, "date    : %-d %-d (GPSWeek)\n", week, dow);
+    fprintf(fp, "time    : %-d %-d (GPSWeek)\n", week, dow);
     fprintf(fp, "length  : %-d\n", config.length);
     fprintf(fp, "interval: %-d\n", config.interval);
 
@@ -314,7 +335,13 @@ void print_config(FILE *fp, const config_t &config)
     fprintf(fp, "\n[output]\n");
     str = config.align_brdc ? "true" : "false";
     fprintf(fp, "align brdc: %s\n", str.c_str());
+    fprintf(fp, "product prefix: %s\n", config.product_prefix.c_str());
+    fprintf(fp, "cls pattern: %s\n", config.cls_pattern.c_str());
+    fprintf(fp, "dif pattern: %s\n", config.dif_pattern.c_str());
+    fprintf(fp, "log pattern: %s\n", config.log_pattern.c_str());
 
+    fprintf(fp, "================end of config================\n");
+    fprintf(fp, "\n");
     fflush(fp);
 }
 

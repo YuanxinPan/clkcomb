@@ -1,14 +1,26 @@
 bin/
 data/
-output
-tmp
-*.clk
-*.bia
-clkcomb
-apps/backup
 table/*.atx
 
+tmp.*
+*.tmp
+*.out
+*.att
+*.bia
+*.clk
+*.cls
+*.sp3
+*.obx
+*.dif
+*.log
+
+## example
+example/*
+!example/products.zip
+!example/comb.ini
+
 ## VS
+.vscode
 Release
 Debug
 vc++/*.*sdf

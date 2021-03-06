@@ -1,6 +1,6 @@
 #include "coord.h"
+#include "../const.h"
 
-#include <pppx/const.h>
 #include <math.h>
 
 double dot(const double *p, const double *q)

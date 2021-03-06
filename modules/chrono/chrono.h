@@ -38,6 +38,6 @@ int ydoy2mjd(int year, int doy);
 
 void date2gwk(int year, int month, int day, int *week, int *wd);
 
-const char *run_tim();
+const char *run_time();
 
 #endif

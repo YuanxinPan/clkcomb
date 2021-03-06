@@ -1,13 +1,12 @@
 #include "RinexAtx.h"
 #include "../io/io.h"
 #include "../coord/coord.h"
+#include "../const.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <algorithm>
 #include <iterator>
-#include <Eigen/Dense>
-#include <pppx/const.h>
 
 bool RinexAtx::atx_t::pco(const std::string &f, double *pco)const
 {
@@ -71,73 +70,6 @@ void RinexAtx::atx_t::pco(double *pco, const std::string &f1, const std::string 
     pco[2] = coef[0]*pcos[i][2] + coef[1]*pcos[j][2];
 }
 
-void RinexAtx::atx_t::pco(const double *xsat, const double *vsat,
-                          const double *xsun, double *pco, double *R)const
-{
-    Eigen::Matrix3d _R;
-    if (R != nullptr) {
-        // copy rotation matrix
-        memcpy(_R.data(), R, sizeof(double)*9); // dst src byte
-        memcpy(R_, R, sizeof(double)*9);
-
-        Eigen::Vector3d antpco;
-        antpco[0] = IF_coef1*pcos[0][0] + IF_coef2*pcos[1][0];
-        antpco[1] = IF_coef1*pcos[0][1] + IF_coef2*pcos[1][1];
-        antpco[2] = IF_coef1*pcos[0][2] + IF_coef2*pcos[1][2];
-
-        Eigen::Vector3d val = _R*antpco;
-        pco[0] = val[0];
-        pco[1] = val[1];
-        pco[2] = val[2];
-        return;
-    }
-
-    double *xscf = _R.data();
-    double *yscf = xscf+3;
-    double *zscf = xscf+6;
-
-    //double vscf[3], u_orbn[3], u_e2sun[3];
-    //sc-fixed z-axis, from sc to earth
-    unit_vector(xsat, zscf);
-    zscf[0] = -zscf[0];
-    zscf[1] = -zscf[1];
-    zscf[2] = -zscf[2];
-
-    //cos of the angle between the sv radius and sun radius vectors
-    //unit_vector(xsun, u_e2sun);
-    //double svbcos = dot(zscf, u_e2sun);
-    //Sun angle w.r.t orbital plane
-    //unit_vector(vsat, vscf);
-    //cross(zscf, vscf, u_orbn);
-    //unit_vector(u_orbn, u_orbn);
-
-    //unint vector from sc to sun
-    double u_sc2sun[3];
-    u_sc2sun[0] = xsun[0] - xsat[0];
-    u_sc2sun[1] = xsun[1] - xsat[1];
-    u_sc2sun[2] = xsun[2] - xsat[2];
-    unit_vector(u_sc2sun, u_sc2sun);
-
-    //the sc-fixed y-axis
-    cross(zscf, u_sc2sun, yscf);
-    unit_vector(yscf, yscf);
-    //the sc-fixed x-axis
-    cross(yscf, zscf, xscf);
-
-    // copy rotation matrix
-    memcpy(R_, _R.data(), sizeof(double)*9);
-
-    Eigen::Vector3d antpco;
-    antpco[0] = IF_coef1*pcos[0][0] + IF_coef2*pcos[1][0];
-    antpco[1] = IF_coef1*pcos[0][1] + IF_coef2*pcos[1][1];
-    antpco[2] = IF_coef1*pcos[0][2] + IF_coef2*pcos[1][2];
-
-    Eigen::Vector3d val = _R*antpco;
-    pco[0] = val[0];
-    pco[1] = val[1];
-    pco[2] = val[2];
-}
-
 double RinexAtx::atx_t::pcv(double zen, double azi)const
 {
     zen *= R2D;
@@ -181,7 +113,6 @@ double RinexAtx::atx_t::pcv(double zen, double azi)const
     return IF_coef1*pcv[0] + IF_coef2*pcv[1];
     //return v[0] + ratio*(v[1] - v[0]);
 }
-
 
 void RinexAtx::close()
 {
@@ -360,193 +291,3 @@ void RinexAtx::skip_atx(FILE *fp)const
     while (fgets(buf, sizeof(buf), fp) &&
            strncmp(buf+60, "END OF ANTENNA", 14) != 0);
 }
-
-#if 0
-bool RinexAtx::read(const std::string &path, const std::vector<std::string> &prns, MJD t)
-{
-    atxFile_ = fopen(path.c_str(), "r");
-    if (atxFile_ == nullptr) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexAtx::read: no such file: %s\n", path.c_str());
-        return false;
-    }
-
-    char buf[256];
-    fgets(buf, sizeof(buf), atxFile_);
-    fgets(buf, sizeof(buf), atxFile_);
-    if (buf[0] != 'A') {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexAtx::read: not an absolute atx: %s\n", path.c_str());
-        return false;
-    }
-    while (strncmp(buf+60, "END OF HEADER", 13)) {
-        fgets(buf, sizeof(buf), atxFile_);
-    }
-
-    return read_satatx(prns, t); // && read_rcvatx(prns);
-}
-
-bool RinexAtx::read_satatx(const std::vector<std::string> &prns, MJD t)
-{
-    char buf[256];
-    SatAtx satAtx;
-    CalendTime calend;
-    MJD beg, end;
-    int ifreq = 0;
-    satAtxs_.reserve(prns.size());
-    while (fgets(buf, sizeof(buf), atxFile_))
-    {
-        if (strncmp(buf+60, "START OF ANTENNA", 16) == 0) {
-            ifreq = 0;
-            beg = end = MJD();
-        }
-        else if (strncmp(buf+60, "TYPE / SERIAL NO", 16) == 0) {
-            if (buf[20] == ' ') {  // receiver antenna
-                backspace(atxFile_);
-                break;
-            }
-            satAtx.name.assign(buf+20, 3);
-            // check whether required
-            if (!std::binary_search(prns.begin(), prns.end(), satAtx.name)) {
-                while (fgets(buf, sizeof(buf), atxFile_) &&
-                       strncmp(buf+60, "END OF ANTENNA", 14) != 0);
-            }
-        }
-        else if (strncmp(buf+60, "ZEN1 / ZEN2 / DZEN", 18) == 0) {
-            sscanf(buf, "%lf%lf%lf", &satAtx.zen1, &satAtx.zen2, &satAtx.dzen);
-        }
-        else if (strncmp(buf+60, "VALID FROM", 10) == 0) {
-            calend.read(buf);
-            beg = calend;
-        }
-        else if (strncmp(buf+60, "VALID UNTIL", 11) == 0) {
-            calend.read(buf);
-            end = calend;
-        }
-        else if (strncmp(buf+60, "START OF FREQUENCY", 18) == 0) {
-            continue;
-        }
-        else if (strncmp(buf+60, "NORTH / EAST / UP", 17) == 0) {
-            sscanf(buf, "%lf%lf%lf", satAtx.pco[ifreq], satAtx.pco[ifreq]+1, satAtx.pco[ifreq]+2);
-            for (int i=0; i<3; ++i)
-                satAtx.pco[ifreq][i] /= 1000; // unit: mm => m
-            fgets(buf, sizeof(buf), atxFile_);
-            int n = static_cast<int>((satAtx.zen2 - satAtx.zen1)/satAtx.dzen) + 1;
-            if (n > MaxSatZen) {
-                fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                        "RinexAtx::read: %2d > MaxSatZen(%2d)\n", n, MaxSatZen);
-                return false;
-            }
-            for (int i=0; i<n; ++i) {
-                sscanf(buf+8+8*i, "%lf", satAtx.pcv[ifreq]+i);
-                satAtx.pcv[ifreq][i] /= 1000; // unit: mm => m
-            }
-        }
-        else if (strncmp(buf+60, "END OF FREQUENCY", 16) == 0) {
-            ++ifreq;
-        }
-        else if (strncmp(buf+60, "END OF ANTENNA", 14) == 0) {
-            if (ifreq > MaxSatFreq) {
-                fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                        "RinexAtx::read: %2d > MaxSatFreq(%2d)\n", ifreq, MaxSatFreq);
-                return false;
-            }
-            satAtx.nfreq = ifreq;
-            if ((t>=beg && t<=end) || (t>=beg && end.d==0))
-                satAtxs_.push_back(satAtx);
-        }
-    }
-
-    std::sort(satAtxs_.begin(), satAtxs_.end());
-    //for (auto atx : satAtxs_) {
-    //    printf("%3s %8.3f %8.3f %8.3f\n", atx.name.c_str(), 1000*atx.pco[0][0], 1000*atx.pco[0][1], 1000*atx.pco[0][2]);
-    //    int n = static_cast<int>((atx.zen2-atx.zen1)/atx.dzen) + 1;
-    //    for (int i=0; i<n; ++i)
-    //        printf("%6.1f ", 1000*atx.pcv[0][i]);
-    //    printf("\n\n");
-    //}
-    return check(prns);
-}
-
-bool RinexAtx::read_rcvatx(const std::vector<std::string> &rcvs)
-{
-    char buf[256];
-    RcvAtx rcvAtx;
-    int ifreq = 0;
-    rcvAtxs_.reserve(rcvs.size());
-    while (fgets(buf, sizeof(buf), atxFile_))
-    {
-        if (strncmp(buf+60, "START OF ANTENNA", 16) == 0) {
-            ifreq = 0;
-        }
-        else if (strncmp(buf+60, "TYPE / SERIAL NO", 16) == 0) {
-            rcvAtx.name.assign(buf, 20);
-            //if (rcvAtx.name[16] == ' ')
-            //    rcvAtx.name.replace(16, 4, "NONE");
-            // check whether required
-            if (!std::binary_search(rcvs.begin(), rcvs.end(), rcvAtx.name)) {
-                while (fgets(buf, sizeof(buf), atxFile_) &&
-                       strncmp(buf+60, "END OF ANTENNA", 14) != 0);
-            }
-        }
-        else if (strncmp(buf+60, "ZEN1 / ZEN2 / DZEN", 18) == 0) {
-            sscanf(buf, "%lf%lf%lf", &rcvAtx.zen1, &rcvAtx.zen2, &rcvAtx.dzen);
-        }
-        else if (strncmp(buf+60, "START OF FREQUENCY", 18) == 0) {
-            continue;
-        }
-        else if (strncmp(buf+60, "NORTH / EAST / UP", 17) == 0) {
-            sscanf(buf, "%lf%lf%lf", rcvAtx.pco[ifreq], rcvAtx.pco[ifreq]+1, rcvAtx.pco[ifreq]+2);
-            for (int i=0; i<3; ++i)
-                rcvAtx.pco[ifreq][i] /= 1000; // unit: mm => m
-            fgets(buf, sizeof(buf), atxFile_);
-            int n = static_cast<int>((rcvAtx.zen2 - rcvAtx.zen1)/rcvAtx.dzen) + 1;
-            if (n > MaxRcvZen) {
-                fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                        "RinexAtx::read: %2d > MaxRcvZen(%2d)\n", n, MaxRcvZen);
-                return false;
-            }
-            for (int i=0; i<n; ++i) {
-                //sscanf(buf+8+8*i, "%lf", rcvAtx.pcv[ifreq]+i);
-                //rcvAtx.pcv[ifreq][i] /= 1000; // unit: mm => m
-            }
-        }
-        else if (strncmp(buf+60, "END OF FREQUENCY", 16) == 0) {
-            ++ifreq;
-        }
-        else if (strncmp(buf+60, "END OF ANTENNA", 14) == 0) {
-            if (ifreq > MaxSatFreq) {
-                fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                        "RinexAtx::read: %2d > MaxSatFreq(%2d)\n", ifreq, MaxSatFreq);
-                return false;
-            }
-            rcvAtx.nfreq = ifreq;
-            rcvAtxs_.push_back(rcvAtx);
-        }
-    }
-    std::sort(rcvAtxs_.begin(), rcvAtxs_.end());
-    return true;
-}
-
-bool RinexAtx::check(const std::vector<std::string> &prns)
-{
-    if (satAtxs_.size() != prns.size()) {
-        std::vector<std::string> prns_;
-        std::vector<std::string> diff;
-        prns_.reserve(prns.size());
-        diff.reserve(prns.size()/4);
-        for (auto it=satAtxs_.begin(); it!=satAtxs_.end(); ++it) {
-            prns_.push_back(it->name);
-        }
-        std::set_difference(prns.begin(), prns.end(), prns_.begin(), prns_.end(), std::back_inserter(diff));
-
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexAtx::read: no atx for:");
-        for (auto it=diff.begin(); it!=diff.end(); ++it)
-            fprintf(stderr, " %3s", it->c_str());
-        fprintf(stderr, "\n");
-        return false;
-    }
-    return true;
-}
-#endif

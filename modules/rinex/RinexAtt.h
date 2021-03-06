@@ -23,7 +23,7 @@ public:
 
     bool read(const std::string &path);
     bool sat_att(MJD t, const std::string &prn, double *q)const; // SV => ECEF
-    bool empty()const { return attFile_ == nullptr; }
+    bool empty()const { return atts_.empty(); }
     void close();
     double interval()const { return interval_; }
     double version()const { return version_; }

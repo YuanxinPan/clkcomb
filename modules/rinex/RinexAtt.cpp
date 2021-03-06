@@ -1,12 +1,12 @@
 #include "RinexAtt.h"
 #include "../io/io.h"
+#include "../const.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
-#include <pppx/const.h>
 
 bool RinexAtt::read(const std::string &path)
 {
@@ -30,7 +30,8 @@ bool RinexAtt::read(const std::string &path)
                 fprintf(stderr, MSG_ERR "RinexAtt::read:: %s", buf);
                 return false;
             } else if (coef.q[0] == 0.0) {
-                fprintf(stderr, MSG_WAR "## %4d %2d %2d %2d %2d %8.2f\n%s", y, m, d, h, min, sec, buf);
+                buf[9] = '\0';
+                fprintf(stderr, MSG_WAR "## %4d %2d %2d %2d %2d %8.2f %s empty\n", y, m, d, h, min, sec, buf);
                 continue;
             }
             if (!std::binary_search(prns_.begin(), prns_.end(), prn)) {

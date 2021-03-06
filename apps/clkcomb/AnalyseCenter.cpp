@@ -1,8 +1,8 @@
 #include "AnalyseCenter.h"
 #include "utils.h"
 
-#include <pppx/const.h>
-#include <pppx/io.h>
+#include <const.h>
+#include <io/io.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -89,7 +89,7 @@ bool AnalyseCenter::read_clock(const config_t &config, const RinexSp3 &refsp3,
             // Attitude correction
             if (config.use_att) {
                 if (!rnxatt_.sat_att(t, prns[isat], qs) || (!refatt.empty() && !refatt.sat_att(t, prns[isat], qr))) {
-                    clk = None;  // try remove this, issue when read igs clock without att
+                    clk = None; // try remove this, issue when read igs clock without att
                 } else {
                     if (refatt.empty()) { // use nominal attitude
                         SunPosition(t.d, t.sod, xsun);
@@ -173,6 +173,54 @@ bool AnalyseCenter::read_staclk(MJD t, int length, int interval,
     }
 
     fclose(fp);
+    return true;
+}
+
+bool AnalyseCenter::att_corr(const config_t &config, const RinexSp3 &refsp3, const RinexAtt &refatt)
+{
+    MJD t = config.mjd;
+    const int length = config.length;
+    const int interval = config.interval;
+    const std::vector<std::string> &prns = config.prns;
+    const size_t nsat_total = prns.size();
+    const size_t nepo_total = length/interval + 1;
+
+    CartCoor pos;
+    // Att
+    double qr[4], qs[4];
+    double xsun[3], f[2];
+    std::vector<double> diffs[2];
+    diffs[0].resize(prns.size());
+    diffs[1].resize(prns.size());
+
+    for (size_t iepo=0; iepo!=nepo_total; ++iepo, t+=interval) {
+        for (size_t isat=0; isat!=nsat_total; ++isat) {
+            // Orbit correction
+            refsp3.satPos(t, prns[isat], pos);
+
+            // Attitude correction
+            if (!rnxatt_.sat_att(t, prns[isat], qs) || (!refatt.empty() && !refatt.sat_att(t, prns[isat], qr))) {
+                sat_clks[isat][iepo] = None; // try remove this, issue when read igs clock without att
+            } else {
+                if (refatt.empty()) { // use nominal attitude
+                    SunPosition(t.d, t.sod, xsun);
+                    nominal_att(pos.data(), xsun, qr);
+                }
+                diffs[1][isat] = qAngularDist(qs, qr);
+                while (diffs[1][isat] - diffs[0][isat] > 180)
+                    diffs[1][isat] -= 360;
+                while (diffs[1][isat] - diffs[0][isat] < -180)
+                    diffs[1][isat] += 360;
+
+                sat_freq(prns[isat], f);
+                double pwu = diffs[1][isat] / 360 / (f[0] + f[1]); // phase windup correction
+                if (sat_clks[isat][iepo] != None)
+                    sat_clks[isat][iepo] += pwu*1E9; // sec => ns
+                diffs[0][isat] = diffs[1][isat];
+            }
+        }
+    }
+
     return true;
 }
 

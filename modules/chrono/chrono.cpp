@@ -42,7 +42,7 @@ void mjd2date(int jd, double sod, int *iy, int *imon, int *id, int *ih, int *im,
 
 int ydoy2mjd(int year, int doy)
 {
-    int m, d;
+    int m, d=0;
     year = yr2year(year);
     doy2date(year, doy, &m, &d);
     return date2mjd(year, m, d);
@@ -113,7 +113,7 @@ void doy2date(int iyear, int idoy, int *imonth, int *iday)
     ++*imonth;
 }
 
-const char *run_tim()
+const char *run_time()
 {
     static char ret[12];
     time_t t;
@@ -122,10 +122,8 @@ const char *run_tim()
     time(&t);
     strcpy(ct, ctime(&t));
     //ct[19] = '\0';
-    ret[0] = ' ';
-    strncpy(ret+1, ct+11, 8);
-    ret[9] = ' ';
-    ret[10] = '\0';
+    strncpy(ret, ct+11, 8);
+    ret[9] = '\0';
 
     return ret;
 }

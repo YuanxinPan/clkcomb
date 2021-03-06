@@ -1,12 +1,12 @@
 #include "RinexSp3.h"
 #include "../io/io.h"
+#include "../const.h"
 #include "../coord/coord.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
-#include <pppx/const.h>
 
 bool operator<(const RinexSp3::Sp3_t &lhs, const RinexSp3::Sp3_t &rhs)
 {
@@ -91,16 +91,16 @@ bool RinexSp3::read(const std::string &path)
 
 bool RinexSp3::read(const std::vector<std::string> &paths)
 {
-    if (paths.size() != 3u) {
+    if (paths.size() != 2u) {
         fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexSp3::read: 3-day SP3 files needed\n");
+                "RinexSp3::read: 2-day SP3 files needed\n");
         return false;
     }
 
-    FILE *fp = fopen(paths[1].c_str(), "r");
+    FILE *fp = fopen(paths[0].c_str(), "r");
     if (fp == nullptr) {
         fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexSp3::read: no such file: %s\n", paths[1].c_str());
+                "RinexSp3::read: no such file: %s\n", paths[0].c_str());
         return false;
     }
 
@@ -146,12 +146,15 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
         // skip header
         while (fgets(buf, sizeof(buf), fp) && buf[0]!='*') { }
 
+        bool end_of_day_record = false; // have SP3 record for 86400 s
+        int nrec = 0;
         int y, m, d, h, min;
         double s;
-        MJD t;
         Sp3_t sp3;
         do {
             if (buf[0] == '*') {
+                if (it!=paths.begin() && ++nrec>1)
+                    break;
                 int n = sscanf(buf+1, "%d%d%d%d%d%lf", &y, &m, &d, &h, &min, &s);
                 if (n != 6) {
                     fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
@@ -160,13 +163,10 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
                 }
                 sp3.t.d = date2mjd(y, m, d);
                 sp3.t.sod = hms2sod(h, min, s);
-                if (t.d == 0) {
-                    t = sp3.t;
-                } else if (sp3.t-t > 86400.0-1E-3) { // skip the predicted records
-                    break;
+                if (fabs(sp3.t.sod - 86400.0) < MaxWnd) { // no need for SP3 of the next day
+                    end_of_day_record = true;
                 }
-            }
-            else {
+            } else {
                 int n = sscanf(buf+4, "%lf%lf%lf", &sp3.pos.x, &sp3.pos.y, &sp3.pos.z);
                 if (n != 3) {
                     fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
@@ -187,6 +187,8 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
             }
         } while (fgets(buf, sizeof(buf), fp) && strncmp(buf, "EOF", 3) != 0);
         fclose(fp);
+        if (end_of_day_record)
+            break;
     } // for in paths
 
     for (auto it=satposs_.begin(); it!=satposs_.end(); ++it)

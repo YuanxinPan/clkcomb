@@ -1,11 +1,11 @@
 #include "Ephemeris.h"
+#include "../const.h"
 #include "../io/io.h"
 
 #include <math.h>
 #include <float.h>
 #include <stdlib.h>
 #include <algorithm>
-#include <pppx/const.h>
 
 Ephemeris::Ephemeris() {}
 
@@ -102,12 +102,12 @@ bool Ephemeris::satPos(MJD t, CartCoor &pos)const
 
 bool Ephemeris::satClk(MJD t, double &sck)const
 {
-    double n0 = sqrt(GM) / pow(sqrtA, 3);
-    double n = n0 + dn;
+    // double n0 = sqrt(GM) / pow(sqrtA, 3);
+    // double n = n0 + dn;
     double dt = t-toe;    // time interval
 
-    double Mt = M0 + n*dt;
-    double Et = calcEt(Mt);
+    // double Mt = M0 + n*dt;
+    // double Et = calcEt(Mt);
     // double deltaTr = F*e*sqrtA*sin(Et);
     sck = clkBias + dt*clkDrift + dt*dt*clkDriftRate; // + deltaTr // - TGD; dual freq obs
     return true;

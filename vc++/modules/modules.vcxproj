@@ -27,11 +27,6 @@
     <ClCompile Include="..\..\modules\rinex\RinexSp3.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\pppx\chrono.h" />
-    <ClInclude Include="..\..\include\pppx\const.h" />
-    <ClInclude Include="..\..\include\pppx\coord.h" />
-    <ClInclude Include="..\..\include\pppx\io.h" />
-    <ClInclude Include="..\..\include\pppx\rinex.h" />
     <ClInclude Include="..\..\modules\chrono\chrono.h" />
     <ClInclude Include="..\..\modules\chrono\Time.h" />
     <ClInclude Include="..\..\modules\coord\CartCoor.h" />

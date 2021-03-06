@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include <pppx/chrono.h>
-#include <pppx/coord.h>
-#include <pppx/rinex.h>
+#include <chrono/chrono.h>
+#include <coord/coord.h>
+#include <rinex/rinex.h>
 #include "Satellite.h"
 #include "config.h"
 
@@ -34,6 +34,8 @@ public:
 
     bool read_staclk(MJD t, int length, int interval,
                      const std::vector<std::string> &sta_list, const RinexSnx &refsnx);
+
+    bool att_corr(const config_t &config, const RinexSp3 &refsp3, const RinexAtt &refatt);
 
     const RinexAtt &rnxatt()const { return rnxatt_; }
     const RinexAtx &rnxatx()const { return rnxatx_; }
@@ -77,6 +79,8 @@ public:
     std::vector<double> nl_bias;
     std::vector<std::vector<double>> sat_clks; // clk of all satellites for all epoches
     std::vector<std::vector<double>> sta_clks; // clk of all stations for all epoches
+    std::vector<std::vector<double>> init_sat_clks; // satellite clk before removing bias
+    std::vector<std::vector<double>> init_sta_clks; // station clk before removing bias
 };
 
 #endif //ANALYSECENTER_H

@@ -7,10 +7,12 @@
 #include <map>
 #include <numeric>
 
-#include <pppx/io.h>
-#include <pppx/const.h>
-#include <pppx/coord.h>
-#include <pppx/rinex.h>
+#include <const.h>
+#include <io/io.h>
+#include <coord/coord.h>
+#include <rinex/rinex.h>
+
+extern FILE *g_logfile;
 
 const size_t MINAC = 3;
 
@@ -55,6 +57,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
               std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac)
 {
     // AC of combined orbit
+    fprintf(stderr, "(%s) read products of %3s...\n", run_time(), combined_ac.name.c_str());
     combined_ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined_ac.name);
     combined_ac.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, combined_ac.name);
     combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
@@ -63,16 +66,16 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
     combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
     std::string sp3_file;
     std::vector<std::string> sp3_files;
-    for (int i=0; i!=3; ++i) {
+    for (int i=0; i!=2; ++i) {
         MJD t = config.mjd;
-        t.d += (i-1);
+        t.d += i;
         sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, combined_ac.name));
     }
 
     if (config.use_att && !combined_ac.read_att(combined_ac.att_file))
         fprintf(stderr, MSG_WAR "use nominal attitude\n");
     // if (!combined_ac.read_orbit(sp3_files/*combined_ac.sp3_file*/) ||
-    if (!combined_ac.read_orbit(combined_ac.sp3_file) ||
+    if (!combined_ac.read_orbit(sp3_files) ||
         !combined_ac.open_atx(combined_ac.atx_file) ||
         (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
         return false;
@@ -80,15 +83,15 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
 
     // each AC
     for (auto it=config.ac_names.begin(); it!=config.ac_names.end(); ++it) {
+        fprintf(stderr, "(%s) read products of %3s...\n", run_time(), it->c_str());
+
         acs.emplace_back(*it);
         AnalyseCenter &ac = acs.back();
 
-        fprintf(stderr, "%3s...\n", it->c_str());
-
         sp3_files.clear();
-        for (int i=0; i!=3; ++i) {
+        for (int i=0; i!=2; ++i) {
             MJD t = config.mjd;
-            t.d += (i-1);
+            t.d += i;
             sp3_file = config.product_path + replace_pattern(config.sp3_pattern, t, *it);
             sp3_files.push_back(sp3_file);
         }
@@ -99,7 +102,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
         ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
         // if (!ac.read_orbit(sp3_files/*ac.sp3_file*/) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
-        if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
+        if (!ac.read_orbit(sp3_files) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
             || (config.use_att && !ac.read_att(ac.att_file))
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
             || !ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt())
@@ -127,11 +130,11 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         }
         std::sort(config.sta_list.begin(), config.sta_list.end());
 
-        printf("COMMON STATION: %3lu\n", config.sta_list.size());
+        fprintf(stderr, "\nCOMMON STATION: %3lu\n", config.sta_list.size());
         for (size_t i=0; i!=config.sta_list.size(); ++i)
         {
             if (i!=0 && i%10 == 0) printf("\n");
-            printf("%4s ", config.sta_list[i].c_str());
+            fprintf(stderr, "%4s ", config.sta_list[i].c_str());
         }
         printf("\n\n");
     }
@@ -291,7 +294,8 @@ bool init_sats(const config_t &config, std::vector<Satellite> &sats)
 bool construct_initclk(const config_t &config,
                        const std::vector<AnalyseCenter> &acs,
                        const std::vector<Satellite> &sats,
-                       std::vector<std::vector<double>> &comb_clks)
+                       std::vector<std::vector<double>> &comb_clks,
+                       int &refac)
 {
     size_t nac_total  = acs.size();
     size_t nsat_total = sats.size();
@@ -325,8 +329,9 @@ bool construct_initclk(const config_t &config,
     }
 
     int imin = std::min_element(stds.begin(), stds.end()) - stds.begin();
-    printf("reference AC: %3s\n", acs[imin].name.c_str());
+    printf("    reference AC: %3s\n", acs[imin].name.c_str());
     comb_clks = acs[imin].sat_clks;
+    refac = imin;
 
     for (auto it=nulls.begin(); it!=nulls.end(); ++it)
     {
@@ -349,7 +354,7 @@ bool construct_initclk(const config_t &config,
             auto itmin = std::min_element(vals.begin(), vals.end());
             int index = itmin - vals.begin();
             comb_clks[*it].assign(acs[index].sat_clks[*it].begin(), acs[index].sat_clks[*it].end());
-            printf("null %3s %3s\n", sats[*it].prn.c_str(), acs[index].name.c_str());
+            printf("    null: %3s -> %3s\n", sats[*it].prn.c_str(), acs[index].name.c_str());
         }
     }
     return true;
@@ -519,7 +524,6 @@ bool align_widelane(const std::vector<Satellite> &sats,
                 sum += it->wl_bias[*j];
         }
         sum /= nhave_bias;
-        // fprintf(stderr, "%3s %8.4f\n", it->name.c_str(), sum);
 
         if (first) {
             mean = sum;
@@ -629,6 +633,39 @@ void align_clock_datum(std::vector<std::vector<double>> &sat_clks,
     }
 }
 
+void align_clock_datum2(std::vector<std::vector<double>> &sat_clks,
+                        std::vector<std::vector<double>> &ref_clks,
+                        const std::vector<int> &adjust_prns,
+                        const std::vector<int> &common_prns,
+                        std::vector<std::vector<double>> &sta_clks, int sample_ratio)
+{
+    // size_t nsat_total = sat_clks.size();
+    size_t nepo_total = sat_clks[0].size();
+    size_t ncommon = common_prns.size();
+    for (size_t epo=0; epo!=nepo_total; ++epo)
+    {
+        double sum[2] = { 0, 0 };
+        // std::vector<double> diff;
+        for (auto it=common_prns.cbegin(); it!=common_prns.cend(); ++it) {
+            // diff.push_back(sat_clks[*it][epo] - ref_clks[*it][epo]);
+            sum[0] += ref_clks[*it][epo];
+            sum[1] += sat_clks[*it][epo];
+        }
+        double mean = (sum[1] - sum[0])/ncommon;
+        // double mean = stable_mean(diff);
+
+        for (auto it=adjust_prns.cbegin(); it!=adjust_prns.cend(); ++it)
+            if (sat_clks[*it][epo] != None)
+                sat_clks[*it][epo] -= mean;
+
+        if (epo % sample_ratio)
+            continue;
+        for (auto it=sta_clks.begin(); it!=sta_clks.end(); ++it)
+            if (it->at(epo/sample_ratio) != None)
+                it->at(epo/sample_ratio) -= mean;
+    }
+}
+
 double satclk_std(const std::vector<double> &clks, const std::vector<double> &refs, double T)
 {
     std::vector<double> diffs;
@@ -655,7 +692,8 @@ double satclk_std(const std::vector<double> &clks, const std::vector<double> &re
 
 static void remove_bias_seg(int beg, int end, std::vector<double> &biass,
                             std::vector<int> index, std::vector<double> &sat_clks,
-                            const Satellite &sat, bool phase_clock)
+                            const Satellite &sat, const std::string &ac_name,
+                            const int niter, bool phase_clock)
 {
     if (biass.empty())
         return;
@@ -668,7 +706,7 @@ static void remove_bias_seg(int beg, int end, std::vector<double> &biass,
     }
     if (n==-1) return;
     if (m==-1) m=index.size();
-    fprintf(stdout, "%4d %4d => %4d %4d\n", n, m, index[n], index[m-1]);
+    fprintf(g_logfile, "%4d %4d => %4d %4d\n", n, m, index[n], index[m-1]);
 
     // Quality control
     std::vector<int> deleted;
@@ -702,18 +740,17 @@ static void remove_bias_seg(int beg, int end, std::vector<double> &biass,
             sat_clks[i] -= bias;
     }
 
-    fprintf(stdout, "bias:  %4d/%4d %8.3f %8.3f\n", count, epo_sum, 1E3*bias, 1E3*std);
+    fprintf(g_logfile, "bias:  %4d/%4d %8.3f %8.3f\n", count, epo_sum, 1E3*bias, 1E3*std);
 
-    // Debug
-    if (!deleted.empty()) {
-        for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
-            fprintf(stdout, " %4d", id[*it]);
-        }
-        fprintf(stdout, "\n");
-    }
+    // outliers
+    //if (!deleted.empty()) {
+    //    for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
+    //        fprintf(g_logfile, "del %2d %3s %4s %4d\n", niter, ac_name.c_str(), sat.prn.c_str(), id[*it]);
+    //    }
+    //}
 }
 
-void remove_clkbias_seg(const std::string &name, const Satellite &sat,
+void remove_clkbias_seg(const std::string &ac_name, const Satellite &sat, const int niter,
                        std::vector<double> &sat_clks, const std::vector<double> &ref_clks, bool phase_clock)
 {
     // Collect bias of each valid epoch
@@ -731,14 +768,13 @@ void remove_clkbias_seg(const std::string &name, const Satellite &sat,
     for (int i=0, size=sat_clks.size(); i<size-1; ++i) {
         if (sat_clks[i]!=None && sat_clks[i+1]==None) {
             segs.push_back(i+1);
-            printf("fault %4d\n", i+1);
+            fprintf(g_logfile, "fault %4d\n", i+1);
         }
     }
 
     std::vector<double> diffs;
     double rms = 0.;
     for (int i=0, size=biass.size(); i<size-1; ++i) {
-        // printf("diff %3s %3s %7d %12.3f\n", name.c_str(), prn.c_str(), id[i], biass[i]-biass[i+1]);
         if (id[i+1]-id[i]==1) {
             diffs.push_back(biass[i]-biass[i+1]);
             rms += pow(diffs.back(), 2);
@@ -750,7 +786,7 @@ void remove_clkbias_seg(const std::string &name, const Satellite &sat,
     for (int i=0, size=diffs.size(); i<size; ++i) {
         if (fabs(diffs[i]) > std::max(5*rms, 0.05)) {
             segs.push_back(id[i+1]);
-            printf("seg %4d\n", id[i+1]);
+            fprintf(g_logfile, "seg %4d\n", id[i+1]);
         }
     }
     segs.push_back(sat_clks.size());
@@ -759,19 +795,20 @@ void remove_clkbias_seg(const std::string &name, const Satellite &sat,
 
     int beg = 0;
     for (auto it=segs.begin(); it!=segs.end(); ++it) {
-        remove_bias_seg(beg, *it, biass, id, sat_clks, sat, phase_clock);
+        remove_bias_seg(beg, *it, biass, id, sat_clks, sat, ac_name, niter, phase_clock);
         beg = *it;
     }
 }
 
-void remove_clock_bias(const std::string &name, const Satellite &sat,
+void remove_clock_bias(const std::string &ac_name,
+                       const Satellite &sat, const int niter,
                        std::vector<double> &sat_clks,
                        const std::vector<double> &ref_clks,
                        bool phase_clock, double &std, bool edit)
 {
     // if (!edit && !phase_clock) {
     if (!edit) {
-        remove_clkbias_seg(name, sat, sat_clks, ref_clks, phase_clock);
+        remove_clkbias_seg(ac_name, sat, niter, sat_clks, ref_clks, phase_clock);
         return;
     }
 
@@ -792,6 +829,7 @@ void remove_clock_bias(const std::string &name, const Satellite &sat,
     detect_outlier(diffs, wgts, deleted);
     for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
         diffs[*it] = 0;
+        if (edit) fprintf(g_logfile, "del %2d %3s %4s %4d\n", niter, ac_name.c_str(), sat.prn.c_str(), id[*it]);
         if (edit) sat_clks[id[*it]] = None; // delete
     }
 
@@ -816,6 +854,7 @@ void remove_clock_bias(const std::string &name, const Satellite &sat,
         double waveNL = 1E9/(sat.f[0] + sat.f[1]); // ns
         bias = floor(bias/waveNL + 0.5)*waveNL;
     }
+
     for (auto it=sat_clks.begin(); it!=sat_clks.end(); ++it) {
         if (*it != None)
             *it -= bias;
@@ -826,15 +865,7 @@ void remove_clock_bias(const std::string &name, const Satellite &sat,
     }
 
     double res_cycle = (mean-bias)/1E9*(sat.f[0]+sat.f[1]);
-    fprintf(stdout, "bias:  %4d/%4d %8.3f %8.3f %8.3f\n", count, epo_sum, 1E3*bias, res_cycle, 1E3*std);
-
-    // Debug
-    if (!deleted.empty()) {
-        for (auto it=deleted.begin(); it!=deleted.end(); ++it) {
-            fprintf(stdout, " %4d", id[*it]);
-        }
-        fprintf(stdout, "\n");
-    }
+    fprintf(g_logfile, "bias:  %4d/%4d %8.3f %8.3f %8.3f\n", count, epo_sum, 1E3*bias, res_cycle, 1E3*std);
 }
 
 void combine_one_epoch(const std::vector<double> &clks,
@@ -886,12 +917,11 @@ double weighted_mean(const std::vector<double> &vals, const std::vector<double> 
     double mean = sum/sum_wgt;
 
     // Residuals
-    // double res;
     double res_sum = 0, wgt_sum = 0;
     // std::vector<double> ress;
     for (auto it=vals.begin(), iw=wgts.begin(); it!=vals.end(); ++it, ++iw)
     {
-        // res = fabs(*it - mean)*(*iw);
+        // double res = fabs(*it - mean)*(*iw);
         // ress.push_back(res);
 
         wgt_sum += *iw;
@@ -902,65 +932,48 @@ double weighted_mean(const std::vector<double> &vals, const std::vector<double> 
     return mean;
 }
 
-void compare_satclks(const config_t &config, const std::string &name,
-                     const std::vector<std::vector<double>> &sat_clks,
-                     const std::vector<std::vector<double>> &ref_clks,
-                     bool epoch_output)
+void compare_clks(const std::vector<std::string> &name_list, const std::string &ac_name,
+                  const std::vector<std::vector<double>> &src_clks,
+                  const std::vector<std::vector<double>> &ref_clks,
+                  std::vector<double> &rmss,
+                  std::vector<double> &stds,
+                  bool epoch_output)
 {
-    const size_t nsat_total = config.prns.size();
+    const size_t ntotal = name_list.size();
 
-    for (size_t isat=0; isat!=nsat_total; ++isat) {
+    for (size_t i=0; i!=ntotal; ++i) {
         int epo = 0;
         std::vector<double> diffs;
-        for (auto it=sat_clks[isat].cbegin(), ref=ref_clks[isat].cbegin(); it!=sat_clks[isat].cend(); ++ref, ++it, ++epo) {
+        double rms = 0.;
+        for (auto it=src_clks[i].cbegin(), ref=ref_clks[i].cbegin(); it!=src_clks[i].cend(); ++ref, ++it, ++epo) {
             if (*it==None || *ref==None)
                 continue;
             double diff = *it - *ref;
+            rms += pow(diff, 2);
             diffs.push_back(diff);
             if (epoch_output)
-                fprintf(stdout, "%4d %3s com-igs %8.3f\n", epo, config.prns[isat].c_str(), 1E3*diff);
+                fprintf(g_logfile, "%4d %3s com-igs %8.3f\n", epo, name_list[i].c_str(), 1E3*diff);
         }
 
         int count = diffs.size();
-        if (count == 0)
+        double bias, std;
+        if (count == 0){
+            bias=None;
+            std=None;
+            rms=None;
+            rmss.push_back(rms);
+            stds.push_back(std);
             continue;
-        double bias = std::accumulate(diffs.begin(), diffs.end(), 0.)/count;
-        double sum = 0;
-        for (auto it=diffs.cbegin(); it!=diffs.cend(); ++it)
-            sum += pow(*it-bias, 2);
-        double std = sqrt(sum/count);
-        fprintf(stdout, "%3s %3s %4d %8.3f %8.3f\n", name.c_str(), config.prns[isat].c_str(), count, 1E3*bias, 1E3*std);
-    }
-}
-
-void compare_staclks(const config_t &config, const std::string &name,
-                     const std::vector<std::vector<double>> &src_clks,
-                     const std::vector<std::vector<double>> &ref_clks,
-                     bool epoch_output)
-{
-    const size_t nsta_total = config.sta_list.size();
-
-    for (size_t ista=0; ista!=nsta_total; ++ista) {
-        int epo = 0;
-        std::vector<double> diffs;
-        for (auto it=src_clks[ista].cbegin(), ref=ref_clks[ista].cbegin(); it!=src_clks[ista].cend(); ++ref, ++it, ++epo) {
-            if (*it==None || *ref==None)
-                continue;
-            double diff = *it - *ref;
-            diffs.push_back(diff);
-            if (epoch_output)
-                fprintf(stdout, "%4d %4s com-igs %8.3f\n", epo, config.sta_list[ista].c_str(), 1E3*diff);
         }
-
-        int count = diffs.size();
-        if (count == 0)
-            continue;
-        double bias = std::accumulate(diffs.begin(), diffs.end(), 0.)/count;
+        bias = std::accumulate(diffs.begin(), diffs.end(), 0.)/count;
+        rms = sqrt(rms/count);
         double sum = 0;
         for (auto it=diffs.cbegin(); it!=diffs.cend(); ++it)
             sum += pow(*it-bias, 2);
-        double std = sqrt(sum/count);
-        fprintf(stdout, "%3s %4s %4d %8.3f %8.3f\n", name.c_str(), config.sta_list[ista].c_str(), count, 1E3*bias, 1E3*std);
+        std = sqrt(sum/count);
+        //fprintf(g_logfile, "%3s %3s %4d %8.3f %8.3f\n", ac_name.c_str(), name_list[i].c_str(), count, 1E3*bias, 1E3*std);
+        rmss.push_back(rms);
+        stds.push_back(std);
     }
 }
 
@@ -978,23 +991,99 @@ void write_satclks(FILE *fp, const config_t &config, const std::string &acn,
     }
 }
 
-void write_satclks_diff(FILE *fp, const config_t &config,
-                        const std::string &prefix, const std::string &acn,
-                        const std::vector<std::vector<double>> &sat_clks,
-                        const std::vector<std::vector<double>> &ref_clks)
+void write_clks_diff(FILE *fp, const std::vector<std::string> &name_list,
+                     const std::string &prefix, const std::string &acn,
+                     const std::vector<std::vector<double>> &src_clks,
+                     const std::vector<std::vector<double>> &ref_clks)
 {
-    size_t nsat_total = sat_clks.size();
-    size_t nepo_total = sat_clks[0].size();
-    for (size_t prn=0; prn!=nsat_total; ++prn) {
-        // fprintf(stderr, "%3s %2lu %3s %6lu %6lu\n", acn.c_str(), prn, config.prns[prn].c_str(), sat_clks[prn].size(), ref_clks[prn].size());
+    size_t name_total = name_list.size();
+    size_t nepo_total = src_clks[0].size();
+    for (size_t i=0; i!=name_total; ++i) {
         for (size_t epo=0; epo!=nepo_total; ++epo) {
-            if (sat_clks[prn][epo]!=None && ref_clks[prn][epo]!=None)
-                fprintf(fp, "%3s %4lu %3s %3s %16.3f\n", prefix.c_str(), epo, acn.c_str(),
-                        config.prns[prn].c_str(), sat_clks[prn][epo] - ref_clks[prn][epo]);
+            if (src_clks[i][epo]!=None && ref_clks[i][epo]!=None)
+                fprintf(fp, "%s %3s %3s %4lu %8.3f\n", prefix.c_str(), acn.c_str(),
+                        name_list[i].c_str(), epo, src_clks[i][epo] - ref_clks[i][epo]);
+            else
+                fprintf(fp, "%s %3s %3s %4lu %8s\n", prefix.c_str(), acn.c_str(), name_list[i].c_str(), epo, "NaN");
         }
     }
-    fflush(fp);
 }
+
+bool write_fip(const std::string &path, MJD t,
+               const std::vector<Satellite> &sats,
+               const std::vector<double> &wl_bias,
+               const std::vector<double> &nl_bias)
+{
+    FILE *fp = fopen(path.c_str(), "w");
+    if (fp == nullptr) {
+        fprintf(stderr, "failed to create file: %s\n", path.c_str());
+        return false;
+    }
+
+    int y, m, d, h, min;
+    double s;
+    mjd2date(t.d, t.sod, &y, &m, &d, &h, &min, &s);
+
+    // header
+    fprintf(fp, "Satellite fractional parts of hardware delays               COMMENT\n");
+    fprintf(fp, "     Post-processing       undifferenced                    FIP TYPE\n");
+    fprintf(fp, " %4d %2d %2d %2d %2d %9.6f                                 TIME OF START\n", y, m, d, 0, 0, 0.);
+    fprintf(fp, " %4d %2d %2d %2d %2d %9.6f                                 TIME OF ENDING\n", y, m, d, 23, 59, 40.);
+    fprintf(fp, "                                                            END OF HEADER\n");
+
+    const size_t nsat = sats.size();
+    for (size_t i=0; i!=nsat; ++i) {
+        fprintf(fp, "*%3s %8.3f%8.3f  1\n", sats[i].prn.c_str(), wl_bias[i], 0.004);
+        fprintf(fp, " %4d %2d %2d %2d %2d %9.6f  %4d %2d %2d %2d %2d %9.6f %7.3f %14.6f\n",
+                y, m, d, 0, 0, 0., y, m, d, 23, 59, 40., nl_bias[i], 0.017);
+    }
+
+    fclose(fp);
+    return true;
+}
+
+void write_clock_datum(const std::vector<std::string> &prns,
+                       char sys, const std::string &acn,
+                       const std::vector<std::vector<double>> &sat_clks,
+                       const std::vector<int> &common_prns)
+{
+    size_t nepo_total = sat_clks[0].size();
+    size_t ncommon = common_prns.size();
+    for (size_t epo=0; epo!=nepo_total; ++epo)
+    {
+        double sum = 0;
+        for (auto it=common_prns.cbegin(); it!=common_prns.cend(); ++it) {
+            sum += sat_clks[*it][epo];
+            fprintf(g_logfile, "raw %3s %3s %6lu %14.3f\n", acn.c_str(), prns[*it].c_str(), epo, sat_clks[*it][epo]);
+        }
+        double mean = sum/ncommon;
+        fprintf(g_logfile, "datum %3s %c %6lu %14.3f\n", acn.c_str(), sys, epo, mean);
+    }
+}
+
+//bool write_att(const std::string &path, const config_t &config, const RinexAtt &rnxatt)
+//{
+//    FILE *fp = fopen(path.c_str(), "w");
+//    if (fp == nullptr) {
+//        fprintf(stderr, "failed to create file: %s\n", path.c_str());
+//        return false;
+//    }
+//
+//    MJD t = config.mjd;
+//    int interval = 300; // 5 min interval for obx output
+//
+//    fprintf(fp, "");
+//    const std::vector<std::string> &prns = config.prns;
+//    size_t nsat = prns.size();
+//
+//    for (size_t isat=0; isat!=nsat; ++isat)
+//    {
+//        for ();
+//    }
+//
+//    fclose(fp);
+//    return true;
+//}
 
 bool write_clkfile(const std::string &path, const config_t &config,
                    const std::vector<std::vector<double>> &satclks,
@@ -1160,6 +1249,224 @@ bool write_bias(const std::string &path, MJD t,
     fprintf(fp, "-BIAS/SOLUTION\n");
     fprintf(fp, "%%=ENDBIA\n");
 
+    fclose(fp);
+    return true;
+}
+
+void clkfit(std::vector<double> clks, const int n, double &a, double &b)
+{
+    int deleted = 1;
+    while (deleted != 0) {
+        deleted = 0;
+        double xsum = 0, ysum = 0, xysum = 0, x2sum = 0;
+        int count = 0;
+        for (int iepo = 0; iepo != n; ++iepo) {
+            if (clks[iepo] != None) {
+                xsum += iepo;             ysum += clks[iepo];
+                xysum += iepo*clks[iepo]; x2sum += iepo*iepo;
+                ++count;
+            }
+        }
+        a = (x2sum*ysum - xsum * xysum) / (x2sum*count - xsum * xsum);
+        b = (count*xysum - xsum * ysum) / (count*x2sum - xsum * xsum);
+
+        std::vector<double> res;
+        for (int iepo = 0; iepo != n; ++iepo) {
+            if (clks[iepo] == None)
+                continue;
+            res.push_back(clks[iepo] - (a + b*iepo));
+            //fprintf(stderr, "res %12.2f\n", clks[iepo] - (a + b * iepo));
+        }
+        double med = median(res);
+
+        std::vector<double> ress;
+        for (int iepo = 0; iepo != n; ++iepo) {
+            if (clks[iepo] == None)
+                continue;
+            ress.push_back(fabs(clks[iepo] - (a + b*iepo) - med));
+            //fprintf(stderr, "ress %20.12f %12.5f\n", clks[iepo],fabs(clks[iepo] - (a + b * iepo) - med));
+        }
+        double mad = median(ress)/0.6745;
+        //fprintf(stderr, "%12.5f %12.5f\n", med, mad);
+
+        for (int iepo = 0; iepo != n; ++iepo) {
+            if (clks[iepo] != None && fabs(clks[iepo] - (a + b*iepo) - med) > 6*mad) {
+                fprintf(g_logfile, "outliers in brdc alignment %4d %20.4f\n", iepo, clks[iepo] - (a + b*iepo));
+                clks[iepo] = None;
+                ++deleted;
+            }
+        }
+    }
+}
+
+bool write_summary(const std::string &path, config_t &config,
+                   const std::vector<AnalyseCenter> &acs,
+                   const std::vector<Satellite> &sats,
+                   std::vector<std::vector<double>> &comb_clks,
+                   std::vector<std::vector<double>> &comb_staclks)
+{
+    FILE *fp = fopen(path.c_str(), "w");
+    if (fp == nullptr) {
+        fprintf(stderr, "failed to creat file: %s\n", path.c_str());
+        return false;
+    }
+
+    size_t nac_total = acs.size();
+    size_t nsat_total = sats.size();
+    size_t nsta_total = config.sta_list.size();
+    size_t nepo_total = config.length/config.interval + 1;
+
+    // Compare with combined clock
+    std::vector<std::vector<double>> sta_bias(nac_total); // ac station RMS
+    std::vector<std::vector<double>> sta_std(nac_total);  // ac station RMS
+    if (config.combine_staclk) {
+        for (size_t i=0; i!=nac_total; ++i)
+            compare_clks(config.sta_list, acs[i].name, acs[i].sta_clks, comb_staclks, sta_bias[i], sta_std[i], false);
+    }
+    std::vector<std::vector<double>> bias(nac_total);  // ac sattelite RMS
+    std::vector<std::vector<double>> std(nac_total);   // ac sattelite RMS
+    for (size_t i=0; i!=nac_total; ++i){
+        compare_clks(config.prns, acs[i].name, acs[i].sat_clks, comb_clks, bias[i], std[i], false);
+    }
+    // Summary--MEAN bias
+    //fprintf(stderr,"%s\n", "summary-bias");
+    fprintf(fp, "      | MEAN (ps) OF AC CLOCK COMPARED TO COMBINATION\n");
+    fprintf(fp, "      |");
+    for (size_t i=0; i!=nac_total; ++i){
+        fprintf(fp, "%6s", acs[i].name.c_str());
+    }
+    fprintf(fp," |\n");
+    fprintf(fp, " -----+");
+    for (size_t i=0; i!=nac_total; ++i){
+        fprintf(fp, "------");
+    }
+    fprintf(fp, "-+\n");
+    for (size_t isat=0; isat!=nsat_total; ++isat) {
+        fprintf(fp, "%5s |", config.prns[isat].c_str());
+        for (size_t i=0; i!=nac_total; ++i){
+            if(bias[i][isat]==None){
+                fprintf(fp, "%6s", "X");
+                continue;
+            }
+            fprintf(fp, "%6d", int(bias[i][isat]*1E3));
+        }
+        fprintf(fp," |\n");
+    }
+    fprintf(fp, " -----+");
+    for (size_t i=0; i!=nac_total; ++i){
+        fprintf(fp, "------");
+    }
+    fprintf(fp, "-+\n");
+
+    if(config.combine_staclk){
+        for (size_t ista=0; ista!=nsta_total; ++ista)
+        {
+            fprintf(fp, "%5s |", config.sta_list[ista].c_str());
+            for (size_t i=0; i!=nac_total; ++i){
+                if(sta_bias[i][ista]==None){
+                    fprintf(fp, "%6s", "X");
+                    continue;
+                }
+                fprintf(fp, "%6d", int(sta_bias[i][ista]*1E3));
+            }
+            fprintf(fp, " |\n");
+        }
+        fprintf(fp, " -----+");
+        for (size_t i=0; i!=nac_total; ++i){
+            fprintf(fp, "------");
+        }
+        fprintf(fp, "-+\n");
+    }
+
+    std::vector<int> nepo_sat(nsat_total);
+    for (size_t isat=0; isat!=nsat_total; ++isat){
+        nepo_sat[isat]=0;
+        for (size_t epo=0; epo!=nepo_total; ++epo){
+            if (comb_clks[isat][epo]!=None){
+                nepo_sat[isat] += 1;
+            }
+        }
+    }
+
+    std::vector<int> nepo_sta(nsta_total);
+    for (size_t ista=0; ista!=nsta_total; ++ista){
+        nepo_sta[ista]=0;
+        for (size_t epo=0, total=config.length/config.sta_interval+1; epo!=total; ++epo){
+            if ( comb_staclks[ista][epo]!=None){
+                nepo_sta[ista] += 1;
+            }
+        }
+    }
+
+    // Summary--RMS
+    //fprintf(stderr,"%s\n", "summary-rms");
+    fprintf(fp, "%s", "      | RMS (ps) OF AC CLOCK COMPARED TO COMBINATION\n");
+    fprintf(fp, "%s", "      |");
+    for (size_t i=0; i!=nac_total; ++i){
+        fprintf(fp, "%6s", acs[i].name.c_str());
+    }
+    fprintf(fp, " | NEPO    RMS\n");
+    fprintf(fp, " -----+");
+    for (size_t i=0; i!=nac_total; ++i){
+        fprintf(fp, "------");
+    }
+    fprintf(fp, "-+-------------\n");
+
+    for (size_t isat=0; isat!=nsat_total; ++isat) {
+        fprintf(fp, "%5s |", config.prns[isat].c_str());
+        double rms=0.;
+        double nac=0;
+        for (size_t i=0; i!=nac_total; ++i){
+            if(std[i][isat]==None){
+                fprintf(fp, "%6s", "X");
+                continue;
+            }
+            fprintf(fp, "%6d", int(std[i][isat]*1E3));
+            nac += 1;
+            rms += pow(std[i][isat]*1E3,2);
+        }
+        if(nac==0){
+            fprintf(fp," | %4d%7s\n", nepo_sat[isat],"X");
+            continue;
+        }
+        rms = sqrt(rms/nac);
+        fprintf(fp," | %4d%7d\n", nepo_sat[isat],int(rms));
+    }
+
+    fprintf(fp, " -----+");
+    for (size_t i=0; i!=nac_total; ++i){
+        fprintf(fp, "------");
+    }
+    fprintf(fp, "-+-------------\n");
+
+    if(config.combine_staclk){
+        for (size_t ista=0; ista!=nsta_total; ++ista)
+        {
+            fprintf(fp, "%5s |", config.sta_list[ista].c_str());
+            double rms=0.;
+            double nac=0;
+            for (size_t i=0; i!=nac_total; ++i){
+                if(sta_std[i][ista]==None){
+                    fprintf(fp, "%6s", "X");
+                    continue;
+                }
+                fprintf(fp, "%6d", int(sta_std[i][ista]*1E3));
+                nac += 1;
+                rms += pow(sta_std[i][ista]*1E3,2);
+            }
+            if(nac==0){
+                fprintf(fp," | %4d%7s\n", nepo_sta[ista],"X");
+                continue;
+            }
+            rms = sqrt(rms/nac);
+            fprintf(fp," | %4d%7d\n", nepo_sta[ista],int(rms));
+        }
+        fprintf(fp, " -----+");
+        for (size_t i=0; i!=nac_total; ++i){
+            fprintf(fp, "------");
+        }
+        fprintf(fp, "-+-------------\n");
+    }
     fclose(fp);
     return true;
 }
