@@ -150,6 +150,7 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
         int nrec = 0;
         int y, m, d, h, min;
         double s;
+        MJD t;
         Sp3_t sp3;
         do {
             if (buf[0] == '*') {
@@ -163,7 +164,10 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
                 }
                 sp3.t.d = date2mjd(y, m, d);
                 sp3.t.sod = hms2sod(h, min, s);
-                if (fabs(sp3.t.sod - 86400.0) < MaxWnd) { // no need for SP3 of the next day
+
+                if (t.d == 0) {
+                    t = sp3.t;
+                } else if (sp3.t-t > 86400.0-1E-3) { // no need for SP3 of the next day
                     end_of_day_record = true;
                 }
             } else {
@@ -186,6 +190,7 @@ bool RinexSp3::read(const std::vector<std::string> &paths)
                 }
             }
         } while (fgets(buf, sizeof(buf), fp) && strncmp(buf, "EOF", 3) != 0);
+
         fclose(fp);
         if (end_of_day_record)
             break;
