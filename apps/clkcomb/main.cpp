@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
     fprintf(stdout, "    constellation: %4lu\n", nsys_total);
     fprintf(stdout, "    satellite    : %4lu\n", nsat_total);
     fprintf(stdout, "    epoch        : %4lu\n", nepo_total);
+    fflush(stdout);
 
     std::string dif_file = replace_pattern(config.dif_pattern, config.mjd);
     FILE *diffile = fopen(dif_file.c_str(), "w");
@@ -106,7 +107,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    fprintf(stderr, "(%s) %s\n", run_time(), "align clock datum...");
+    fprintf(stdout, "(%s) %s\n", run_time(), "align clock datum..."); fflush(stdout);
 
     // Count epochs for each PRN
     std::vector<std::vector<size_t>> clk_counts(nac_total);
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
         int end   = prns_per_system[isys].back() + 1; // one past last
         size_t count_max = *std::max_element(&prn_counts[begin], &prn_counts[end]);
         if (count_max==0) {
-            fprintf(stdout, MSG_ERR "bad [session]:length or [constellation]:system setting\n");
+            fprintf(stderr, MSG_ERR "bad [session]:length or [constellation]:system setting\n");
             return 1;
         }
 
@@ -201,7 +202,7 @@ int main(int argc, char *argv[])
     //         align_clock_datum(combined_ac.sat_clks, acs[0].sat_clks, prns_per_system[isys], common_prns[isys]);
     // }
 
-    fprintf(stderr, "(%s) %s\n", run_time(), "construct reference clock...");
+    fprintf(stdout, "(%s) %s\n", run_time(), "construct reference clock..."); fflush(stdout);
 
     // Construct initial combined clock
     std::vector<std::vector<double>> comb_satclks;
@@ -266,7 +267,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    fprintf(stderr, "(%s) %s\n", run_time(), "iterative combination...");
+    fprintf(stdout, "(%s) %s\n", run_time(), "iterative combination..."); fflush(stdout);
 
     bool weight_ac = config.weight_method == "ac" || config.combine_staclk;
     // Iteration
@@ -276,7 +277,7 @@ int main(int argc, char *argv[])
     while (niter < max_niter)
     {
         ++niter;
-        fprintf(stderr, "(%s) iter #%1d...\n", run_time(), niter);
+        fprintf(stdout, "(%s) iter #%1d...\n", run_time(), niter); fflush(stdout);
         fprintf(g_logfile, "\n** iter #%1d **\n", niter);
 
         // Remove clock bias between ACs & Determine weight
@@ -356,22 +357,23 @@ int main(int argc, char *argv[])
                 clk_wgts[iac].assign(nsat_total, wgt);
             }
             for (size_t iac=0; iac!=nac_total; ++iac) {
-                fprintf(stderr, "    weight: %3s %6.2f%%\n", acs[iac].name.c_str(), 100*clk_wgts[iac][0]/wgt_sum);
+                fprintf(stdout, "    weight: %3s %6.2f%%\n", acs[iac].name.c_str(), 100*clk_wgts[iac][0]/wgt_sum);
                 acs[iac].weight = clk_wgts[iac][0]/wgt_sum;
             }
         } else { // ouput satellite weight
             for (size_t iprn=0; iprn!=nsat_total; ++iprn) {
-                fprintf(stderr, "    weight: %3s", config.prns[iprn].c_str());
+                fprintf(stdout, "    weight: %3s", config.prns[iprn].c_str());
                 double wgt_sum = 0;
                 for (size_t i=0; i!=nac_total; ++i)
                     wgt_sum += clk_wgts[i][iprn];
 
                 for (size_t i=0; i!=nac_total; ++i) {
-                    fprintf(stderr, " %6.2f", 100*clk_wgts[i][iprn]/wgt_sum);
+                    fprintf(stdout, " %6.2f", 100*clk_wgts[i][iprn]/wgt_sum);
                 }
-                fprintf(stderr, "\n");
+                fprintf(stdout, "\n");
             }
         }
+        fflush(stdout);
 
         // Combination
         for (size_t iprn=0; iprn!=nsat_total; ++iprn)
@@ -450,13 +452,13 @@ int main(int argc, char *argv[])
 
     // Output CLS file
     std::string cls_file = replace_pattern(config.cls_pattern, config.mjd, config.product_prefix);
-    fprintf(stderr, "(%s) %s\n", run_time(), "write cls file...");
+    fprintf(stdout, "(%s) %s\n", run_time(), "write cls file..."); fflush(stdout);
     write_summary(cls_file, config, acs, sats, comb_satclks, comb_staclks);
-    fprintf(stderr, "    -> %s\n", cls_file.c_str());
+    fprintf(stdout, "    -> %s\n", cls_file.c_str()); fflush(stdout);
 
     // align to broadcast ephemeris
     if (config.align_brdc) {
-        fprintf(stderr, "(%s) %s\n", run_time(), "align to broadcast ephemeris...");
+        fprintf(stdout, "(%s) %s\n", run_time(), "align to broadcast ephemeris..."); fflush(stdout);
 
         std::string nav_file = config.product_path + replace_pattern(config.nav_pattern, config.mjd);
         RinexNav rnxnav;
@@ -492,7 +494,7 @@ int main(int argc, char *argv[])
 
         double offset, drift;
         clkfit(diffs, nepo_total, offset, drift);
-        fprintf(stderr, "    brdc fit: %12.3f(ps) %12.3f(ps/d)\n", offset*1E3, drift*1E3*86400/config.interval);
+        fprintf(stdout, "    brdc fit: %12.3f(ps) %12.3f(ps/d)\n", offset*1E3, drift*1E3*86400/config.interval); fflush(stdout);
         fprintf(g_logfile,  "brdc fit: %12.3f(ps) %12.3f(ps/d)\n", offset*1E3, drift*1E3*86400/config.interval);
 
         // double xsum=0, ysum=0, xysum=0, x2sum=0;
@@ -533,7 +535,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    fprintf(stderr, "(%s) %s\n", run_time(), "write clk file...");
+    fprintf(stdout, "(%s) %s\n", run_time(), "write clk file..."); fflush(stdout);
 
     // ns => s
     for (size_t sat=0; sat!=nsat_total; ++sat)
@@ -547,7 +549,7 @@ int main(int argc, char *argv[])
 
     std::string clk_file = replace_pattern(config.clk_pattern, config.mjd, config.product_prefix);
     write_clkfile(clk_file, config, comb_satclks, comb_staclks, combined_ac.rnxsnx());
-    fprintf(stderr, "    -> %s\n", clk_file.c_str());
+    fprintf(stdout, "    -> %s\n", clk_file.c_str()); fflush(stdout);
 
     if (config.phase_clock) {
         std::string bia_file = replace_pattern(config.bia_pattern, config.mjd, config.product_prefix);

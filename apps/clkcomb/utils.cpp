@@ -57,7 +57,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
               std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac)
 {
     // AC of combined orbit
-    fprintf(stderr, "(%s) read products of %3s...\n", run_time(), combined_ac.name.c_str());
+    fprintf(stdout, "(%s) read products of %3s...\n", run_time(), combined_ac.name.c_str()); fflush(stdout);
     combined_ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined_ac.name);
     combined_ac.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, combined_ac.name);
     combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
@@ -83,7 +83,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
 
     // each AC
     for (auto it=config.ac_names.begin(); it!=config.ac_names.end(); ++it) {
-        fprintf(stderr, "(%s) read products of %3s...\n", run_time(), it->c_str());
+        fprintf(stdout, "(%s) read products of %3s...\n", run_time(), it->c_str()); fflush(stdout);
 
         acs.emplace_back(*it);
         AnalyseCenter &ac = acs.back();
@@ -130,13 +130,14 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         }
         std::sort(config.sta_list.begin(), config.sta_list.end());
 
-        fprintf(stderr, "\nCOMMON STATION: %3lu\n", config.sta_list.size());
+        fprintf(stdout, "\nCOMMON STATION: %3lu\n", config.sta_list.size());
         for (size_t i=0; i!=config.sta_list.size(); ++i)
         {
             if (i!=0 && i%10 == 0) printf("\n");
-            fprintf(stderr, "%4s ", config.sta_list[i].c_str());
+            fprintf(stdout, "%4s ", config.sta_list[i].c_str());
         }
-        printf("\n\n");
+        fprintf(stdout, "\n\n");
+        fflush(stdout);
     }
 
     // if (!combined_ac.open_clock(combined_ac.clk_file))
@@ -355,7 +356,8 @@ bool construct_initclk(const config_t &config,
             auto itmin = std::min_element(vals.begin(), vals.end());
             int index = itmin - vals.begin();
             comb_clks[*it].assign(acs[index].sat_clks[*it].begin(), acs[index].sat_clks[*it].end());
-            printf("    null: %3s -> %3s\n", sats[*it].prn.c_str(), acs[index].name.c_str());
+            if (fabs(*itmin - 9.9*1E3*(nac_total-1)) > MaxWnd)
+                printf("    null: %3s -> %3s\n", sats[*it].prn.c_str(), acs[index].name.c_str());
         }
     }
     return true;
@@ -1012,7 +1014,7 @@ bool write_fip(const std::string &path, MJD t,
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
-        fprintf(stderr, "failed to create file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR"failed to create file: %s\n", path.c_str());
         return false;
     }
 
@@ -1088,7 +1090,7 @@ bool write_clkfile(const std::string &path, const config_t &config,
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
-        fprintf(stderr, "failed to create file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR"failed to create file: %s\n", path.c_str());
         return false;
     }
 
@@ -1220,7 +1222,7 @@ bool write_bias(const std::string &path, MJD t,
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
-        fprintf(stderr, "failed to create file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR"failed to create file: %s\n", path.c_str());
         return false;
     }
 
@@ -1303,7 +1305,7 @@ bool write_summary(const std::string &path, config_t &config,
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
-        fprintf(stderr, "failed to creat file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR"failed to creat file: %s\n", path.c_str());
         return false;
     }
 

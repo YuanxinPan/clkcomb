@@ -25,7 +25,7 @@ do
     done
 
     # plot
-    ./plot_clkdif.py $TEMP_DIR $prn
+    plot_clkdif.py $TEMP_DIR $prn
 done
 
 rm -rf $TEMP_DIR
