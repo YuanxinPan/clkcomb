@@ -92,10 +92,7 @@ void compare_clks(const std::vector<std::string> &name_list,
                      std::vector<double> &stds,
                      bool epoch_output);
 
-bool write_clkfile(const std::string &path, const config_t &config,
-                   const std::vector<std::vector<double>> &satclks,
-                   const std::vector<std::vector<double>> &staclks,
-                   const RinexSnx &rnxsnx);
+bool write_clkfile(const std::string &path, const config_t &config, const AnalyseCenter &combined);
 
 bool write_bias(const std::string &path, MJD t,
                 const std::vector<Satellite> &sats,

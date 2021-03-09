@@ -54,30 +54,30 @@ std::string replace_pattern(const std::string &pattern, MJD t,
 }
 
 bool init_acs(config_t &config, const std::vector<Satellite> &sats,
-              std::vector<AnalyseCenter> &acs, AnalyseCenter &combined_ac)
+              std::vector<AnalyseCenter> &acs, AnalyseCenter &combined)
 {
     // AC of combined orbit
-    fprintf(stdout, "(%s) read products of %3s...\n", run_time(), combined_ac.name.c_str()); fflush(stdout);
-    combined_ac.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined_ac.name);
-    combined_ac.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, combined_ac.name);
-    combined_ac.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined_ac.name);
-    combined_ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined_ac.name);
-    combined_ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined_ac.name);
-    combined_ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined_ac.name);
+    fprintf(stdout, "(%s) read products of %3s...\n", run_time(), combined.name.c_str()); fflush(stdout);
+    combined.atx_file = replace_pattern(config.atx_pattern, config.mjd, combined.name);
+    combined.att_file = config.product_path + replace_pattern(config.att_pattern, config.mjd, combined.name);
+    combined.bia_file = config.product_path + replace_pattern(config.bia_pattern, config.mjd, combined.name);
+    combined.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, combined.name);
+    combined.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, combined.name);
+    combined.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, combined.name);
     std::string sp3_file;
     std::vector<std::string> sp3_files;
     for (int i=0; i!=2; ++i) {
         MJD t = config.mjd;
         t.d += i;
-        sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, combined_ac.name));
+        sp3_files.push_back(config.product_path + replace_pattern(config.sp3_pattern, t, combined.name));
     }
 
-    if (config.use_att && !combined_ac.read_att(combined_ac.att_file))
+    if (config.use_att && !combined.read_att(combined.att_file))
         fprintf(stderr, MSG_WAR "use nominal attitude\n");
-    // if (!combined_ac.read_orbit(sp3_files/*combined_ac.sp3_file*/) ||
-    if (!combined_ac.read_orbit(sp3_files) ||
-        !combined_ac.open_atx(combined_ac.atx_file) ||
-        (config.combine_staclk && !combined_ac.read_sinex(combined_ac.snx_file))) {
+    // if (!combined.read_orbit(sp3_files/*combined.sp3_file*/) ||
+    if (!combined.read_orbit(sp3_files) ||
+        !combined.open_atx(combined.atx_file) ||
+        (config.combine_staclk && !combined.read_sinex(combined.snx_file))) {
         return false;
     }
 
@@ -105,7 +105,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         if (!ac.read_orbit(sp3_files) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
             || (config.use_att && !ac.read_att(ac.att_file))
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
-            || !ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt())
+            || !ac.read_clock(config, combined.rnxsp3(), combined.rnxatx(), combined.rnxatt())
             || (config.phase_clock && !ac.read_bias(ac.bia_file, config.prns, sats))) {
             acs.pop_back();
             fprintf(stderr, MSG_WAR "remove AC without products: %s\n", it->c_str());
@@ -140,13 +140,13 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         fflush(stdout);
     }
 
-    // if (!combined_ac.open_clock(combined_ac.clk_file))
+    // if (!combined.open_clock(combined.clk_file))
     //     return false;
-    // combined_ac.read_clock(config, combined_ac.rnxsp3(), combined_ac.rnxatx(), combined_ac.rnxatt());
+    // combined.read_clock(config, combined.rnxsp3(), combined.rnxatx(), combined.rnxatt());
     if (config.combine_staclk) {
-        // combined_ac.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
+        // combined.read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined.rnxsnx());
         for (auto it=acs.begin(); it!=acs.end(); ++it)
-            it->read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined_ac.rnxsnx());
+            it->read_staclk(config.mjd, config.length, config.sta_interval, config.sta_list, combined.rnxsnx());
     }
 
     // Check whether we have enough ACs
@@ -420,7 +420,7 @@ void detect_outlier(const std::vector<double> &vals,
 
 bool align_widelane(const std::vector<Satellite> &sats,
                     std::vector<AnalyseCenter> &acs,
-                    AnalyseCenter &combined_ac,
+                    AnalyseCenter &combined,
                     const std::vector<int> &prns)
 {
     size_t nsat = prns.size();
@@ -474,8 +474,8 @@ bool align_widelane(const std::vector<Satellite> &sats,
                 bias.push_back(acs[j].wl_bias[*i]);
 
         if (bias.size() < MINAC) {
-            combined_ac.have_bias[*i] = 0;
-            combined_ac.wl_bias[*i] = None;
+            combined.have_bias[*i] = 0;
+            combined.wl_bias[*i] = None;
             continue;
         }
         double max = *std::max_element(bias.begin(), bias.end());
@@ -512,7 +512,7 @@ bool align_widelane(const std::vector<Satellite> &sats,
                 ++count;
         }
         if (count == nac) {
-            combined_ac.have_bias[*iprn] = 1;
+            combined.have_bias[*iprn] = 1;
             ++nhave_bias;
         }
     }
@@ -523,7 +523,7 @@ bool align_widelane(const std::vector<Satellite> &sats,
     {
         double sum = 0;
         for (auto j=prns.begin(); j!=prns.end(); ++j) {
-            if (combined_ac.have_bias[*j])
+            if (combined.have_bias[*j])
                 sum += it->wl_bias[*j];
         }
         sum /= nhave_bias;
@@ -562,11 +562,11 @@ bool align_widelane(const std::vector<Satellite> &sats,
         printf(" %7.3f\n", mean);
 
         if (mean == None) {
-            combined_ac.have_bias[*i] = 0;
-            combined_ac.wl_bias[*i] = None;
+            combined.have_bias[*i] = 0;
+            combined.wl_bias[*i] = None;
         } else {
-            combined_ac.have_bias[*i] = 1;
-            combined_ac.wl_bias[*i] = mean;
+            combined.have_bias[*i] = 1;
+            combined.wl_bias[*i] = mean;
         }
     }
 
@@ -907,8 +907,10 @@ void combine_one_epoch(const std::vector<double> &clks,
 
 double weighted_mean(const std::vector<double> &vals, const std::vector<double> &wgts, double &wrms)
 {
-    if (vals.size() < MINAC)
+    if (vals.size() < MINAC) {
+        wrms = 0;
         return None;
+    }
 
     double sum = 0, sum_wgt = 0;
     for (auto it=vals.begin(), iw=wgts.begin(); it!=vals.end(); ++it, ++iw)
@@ -1083,10 +1085,7 @@ void write_clock_datum(const std::vector<std::string> &prns,
 //    return true;
 //}
 
-bool write_clkfile(const std::string &path, const config_t &config,
-                   const std::vector<std::vector<double>> &satclks,
-                   const std::vector<std::vector<double>> &staclks,
-                   const RinexSnx &rnxsnx)
+bool write_clkfile(const std::string &path, const config_t &config, const AnalyseCenter &combined)
 {
     FILE *fp = fopen(path.c_str(), "w");
     if (fp == nullptr) {
@@ -1102,17 +1101,17 @@ bool write_clkfile(const std::string &path, const config_t &config,
 
     size_t nsat = prns.size();
     size_t nsta = site_list.size();
-    size_t nepo = satclks[0].size();
+    size_t nepo = combined.sat_clks[0].size();
     size_t nepo_sta = 0;
     if (config.combine_staclk)
-        nepo_sta = staclks[0].size();
+        nepo_sta = combined.sta_clks[0].size();
     size_t ratio = interval_sta/interval;
 
     // collect valid prns with clk
     std::vector<std::string> valid_prns;
     for (size_t i=0; i!=nsat; ++i) {
         for (size_t j=0; j!=nepo; ++j) {
-            if (satclks[i][j] != None) {
+            if (combined.sat_clks[i][j] != None) {
                 valid_prns.push_back(prns[i]);
                 break;
             }
@@ -1124,7 +1123,7 @@ bool write_clkfile(const std::string &path, const config_t &config,
     if (config.combine_staclk) {
         for (size_t i=0; i!=nsta; ++i) {
             for (size_t j=0; j!=nepo_sta; ++j) {
-                if (staclks[i][j] != None) {
+                if (combined.sta_clks[i][j] != None) {
                     valid_sites.push_back(site_list[i]);
                     break;
                 }
@@ -1149,6 +1148,7 @@ bool write_clkfile(const std::string &path, const config_t &config,
     fprintf(fp, "    %2d                                                      LEAP SECONDS        \n", leap_sec);
 
     if (config.combine_staclk) {
+        const RinexSnx &rnxsnx = combined.rnxsnx();
         fprintf(fp, "   %3lu %73s\n", valid_sites.size(), "# OF SOLN STA / TRF ");
         for (size_t i=0; i!=valid_sites.size(); ++i) {
             std::string dome;
@@ -1180,18 +1180,19 @@ bool write_clkfile(const std::string &path, const config_t &config,
 
         if (config.combine_staclk && i%ratio == 0) {
             for (size_t j=0; j!=nsta; ++j) {
-                if (staclks[j][i/ratio] == None)
+                if (combined.sta_clks[j][i/ratio] == None)
                     continue;
-                fprintf(fp, "AR %4s %4d %02d %02d %02d %02d %9.6f  1 %21.12E\n",
-                        site_list[j].c_str(), y, m, d, h, min, s, staclks[j][i/ratio]);
+                fprintf(fp, "AR %4s %4d %02d %02d %02d %02d %9.6f  2   %19.12E %19.12E\n",
+                        site_list[j].c_str(), y, m, d, h, min, s,
+                        combined.sta_clks[j][i/ratio], combined.sta_stds[j][i/ratio]);
             }
         }
 
         for (size_t j=0; j!=nsat; ++j) {
-            if (satclks[j][i] == None)
+            if (combined.sat_clks[j][i] == None)
                 continue;
-            fprintf(fp, "AS %3s  %4d %02d %02d %02d %02d %9.6f  1 %21.12E\n",
-                    prns[j].c_str(), y, m, d, h, min, s, satclks[j][i]);
+            fprintf(fp, "AS %3s  %4d %02d %02d %02d %02d %9.6f  2   %19.12E %19.12E\n",
+                    prns[j].c_str(), y, m, d, h, min, s, combined.sat_clks[j][i], combined.sat_stds[j][i]);
         }
     }
 

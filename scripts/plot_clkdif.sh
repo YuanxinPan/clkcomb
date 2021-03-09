@@ -2,6 +2,9 @@
 
 [ $# -ne 2 ] && echo "usage: plot_clkdif.sh dif_file log_file" && exit 1
 
+# Check python installation
+python -V > /dev/null 2>&1 || { echo "python3 (with matplotlib) needs to be installed"; exit 1; }
+
 # Input
 dif_file=$1
 log_file=$2
@@ -25,7 +28,7 @@ do
     done
 
     # plot
-    plot_clkdif.py $TEMP_DIR $prn
+    plot_clkdif.py $TEMP_DIR $prn || break
 done
 
 rm -rf $TEMP_DIR

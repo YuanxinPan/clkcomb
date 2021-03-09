@@ -79,7 +79,9 @@ public:
     std::vector<double> wl_bias;
     std::vector<double> nl_bias;
     std::vector<std::vector<double>> sat_clks; // clk of all satellites for all epoches
+    std::vector<std::vector<double>> sat_stds; // std of all satellites for all clocks
     std::vector<std::vector<double>> sta_clks; // clk of all stations for all epoches
+    std::vector<std::vector<double>> sta_stds; // std of all stations for all clocks
     std::vector<std::vector<double>> init_sat_clks; // satellite clk before removing bias
     std::vector<std::vector<double>> init_sta_clks; // station clk before removing bias
 };
