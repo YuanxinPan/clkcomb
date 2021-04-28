@@ -280,6 +280,23 @@ bool RinexSp3::satPosVel(MJD t, const std::string &prn, double *pos, double *vel
         vel[2] = (poss[1][2] - poss[0][2])/(2.0*dt);
         return true;
     }
+
+    // if (satPos(t, prn, poss[0]) && satPos(t+dt, prn, poss[1])) {
+    //     pos[0] = poss[0][0];
+    //     pos[1] = poss[0][1];
+    //     pos[2] = poss[0][2];
+
+    //     double theta = -dt*We;
+    //     double x = poss[1][0];
+    //     poss[1][0] = poss[1][0]*cos(theta) + poss[1][1]*sin(theta);
+    //     poss[1][1] = poss[1][1]*cos(theta) - x*sin(theta);
+
+    //     vel[0] = (poss[1][0] - poss[0][0])/(2.0*dt);
+    //     vel[1] = (poss[1][1] - poss[0][1])/(2.0*dt);
+    //     vel[2] = (poss[1][2] - poss[0][2])/(2.0*dt);
+    //     return true;
+    // }
+
     return false;
 }
 

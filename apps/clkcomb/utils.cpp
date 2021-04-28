@@ -14,7 +14,7 @@
 
 extern FILE *g_logfile;
 
-const size_t MINAC = 3;
+const size_t MINAC = 2;
 
 std::string replace_pattern(const std::string &pattern, MJD t,
                             const std::string &prefix,
@@ -74,7 +74,7 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
 
     if (config.use_att && !combined.read_att(combined.att_file))
         fprintf(stderr, MSG_WAR "use nominal attitude\n");
-    // if (!combined.read_orbit(sp3_files/*combined.sp3_file*/) ||
+    // if (!combined.read_orbit(combined.sp3_file) ||
     if (!combined.read_orbit(sp3_files) ||
         !combined.open_atx(combined.atx_file) ||
         (config.combine_staclk && !combined.read_sinex(combined.snx_file))) {
@@ -101,9 +101,11 @@ bool init_acs(config_t &config, const std::vector<Satellite> &sats,
         ac.clk_file = config.product_path + replace_pattern(config.clk_pattern, config.mjd, *it);
         ac.snx_file = config.product_path + replace_pattern(config.snx_pattern, config.mjd, *it);
         ac.sp3_file = config.product_path + replace_pattern(config.sp3_pattern, config.mjd, *it);
-        // if (!ac.read_orbit(sp3_files/*ac.sp3_file*/) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
+        if (config.use_att && !ac.read_att(ac.att_file))
+            fprintf(stderr, MSG_WAR"use %s without att\n", it->c_str());
+        // if (!ac.read_orbit(ac.sp3_file) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
         if (!ac.read_orbit(sp3_files) || !ac.open_clock(ac.clk_file) || !ac.open_atx(ac.atx_file)
-            || (config.use_att && !ac.read_att(ac.att_file))
+            // || (config.use_att && !ac.read_att(ac.att_file))
             || (config.combine_staclk && !ac.read_sinex(ac.snx_file))
             || !ac.read_clock(config, combined.rnxsp3(), combined.rnxatx(), combined.rnxatt())
             || (config.phase_clock && !ac.read_bias(ac.bia_file, config.prns, sats))) {
@@ -331,7 +333,8 @@ bool construct_initclk(const config_t &config,
     }
 
     int imin = std::min_element(stds.begin(), stds.end()) - stds.begin();
-    printf("    reference AC: %3s\n", acs[imin].name.c_str());
+    fprintf(stdout,"    reference AC: %3s\n", acs[imin].name.c_str());
+    fprintf(g_logfile, "reference AC: %3s\n", acs[imin].name.c_str());
     comb_clks = acs[imin].sat_clks;
     refac = imin;
 
@@ -356,7 +359,7 @@ bool construct_initclk(const config_t &config,
             auto itmin = std::min_element(vals.begin(), vals.end());
             int index = itmin - vals.begin();
             comb_clks[*it].assign(acs[index].sat_clks[*it].begin(), acs[index].sat_clks[*it].end());
-            if (fabs(*itmin - 9.9*1E3*(nac_total-1)) > MaxWnd)
+            // if (fabs(*itmin - 9.9*1E3*(nac_total-1)) > MaxWnd)
                 printf("    null: %3s -> %3s\n", sats[*it].prn.c_str(), acs[index].name.c_str());
         }
     }
@@ -543,15 +546,15 @@ bool align_widelane(const std::vector<Satellite> &sats,
     // 4. mean WL
     for (auto i=prns.begin(); i!=prns.end(); ++i)
     {
-        printf("%3s WL ", sats[*i].prn.c_str());
+        fprintf(g_logfile, "%3s WL ", sats[*i].prn.c_str());
         // double sum = 0;
         std::vector<double> vals;
         for (auto it=acs.begin(); it!=acs.end(); ++it) {
             if (!it->have_bias[*i]) {
-                printf(" %7s", "");
+                fprintf(g_logfile, " %7s", "");
                 continue;
             }
-            printf(" %7.3f", it->wl_bias[*i]);
+            fprintf(g_logfile, " %7.3f", it->wl_bias[*i]);
             // sum += it->wl_bias[*i];
             if (it->name == "gbm") // gbm/esa only one
                 continue;
@@ -559,7 +562,7 @@ bool align_widelane(const std::vector<Satellite> &sats,
         }
         // double mean = sum/nac;
         double mean = stable_mean(vals);
-        printf(" %7.3f\n", mean);
+        fprintf(g_logfile, " %7.3f\n", mean);
 
         if (mean == None) {
             combined.have_bias[*i] = 0;

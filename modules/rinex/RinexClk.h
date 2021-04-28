@@ -41,6 +41,7 @@ private:
     FILE *clkFile_;
     char buf_[256];
     MJD time_[2];
+    double version_;
     double interval_;
     std::vector<std::string> prns_;
     //std::array<Coef_t, NMaxSat> coefs_[2];

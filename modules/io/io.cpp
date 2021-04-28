@@ -10,12 +10,12 @@ void skip_nline(FILE *fp, int n)
         fgets(buf, sizeof(buf), fp);
 }
 
-void skip_header(FILE *fp)
+void skip_header(FILE *fp, int shift)
 {
     char buf[128];
     do {
         fgets(buf, sizeof(buf), fp);
-    } while (strncmp(buf+60, "END OF HEADER", 13));
+    } while (strncmp(buf+shift, "END OF HEADER", 13));
 }
 
 //void skip_nline(std::ifstream &in, int n)

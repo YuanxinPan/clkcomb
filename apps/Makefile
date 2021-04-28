@@ -2,7 +2,7 @@ DIR_GUARD = @mkdir -p $(@D)
 BIN_PATH = ../bin/
 OBJ_PATH = ../bin/obj/apps/
 
-MODULE := clkcomb att
+MODULE := att clkcomb
           
 TARGET := $(addprefix $(BIN_PATH), $(MODULE))
 all : $(TARGET)

@@ -23,8 +23,8 @@ do
 
     for ac in ${ACs[*]}
     do
-        grep "$ac $prn"        "$dif_file" > $TEMP_DIR/dif_${ac}_$prn
-        grep "del .. $ac $prn" "$log_file" > $TEMP_DIR/del_${ac}_$prn
+        grep "$ac $prn"         "$dif_file" > $TEMP_DIR/dif_${ac}_$prn
+        grep "del .. $ac  $prn" "$log_file" > $TEMP_DIR/del_${ac}_$prn
     done
 
     # plot

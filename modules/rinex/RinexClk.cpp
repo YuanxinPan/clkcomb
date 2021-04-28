@@ -25,17 +25,29 @@ bool RinexClk::read(const std::string &path)
         return false;
     }
 
+    // version
+    fgets(buf_, 256, clkFile_);
+    version_ = atof(buf_);
+    int shift, nprn_per_line;
+    if (version_ > 3.03) {
+        shift = 65;
+        nprn_per_line = 16;
+    } else {
+        shift = 60;
+        nprn_per_line = 15;
+    }
+
     size_t ns = 0u;
     std::string prn;
     while (fgets(buf_, 256, clkFile_))
     {
-        if (strncmp(buf_+60, "END OF HEADER", 13) == 0)
+        if (strncmp(buf_+shift, "END OF HEADER", 13) == 0)
             break;
-        else if (strncmp(buf_+60, "# OF SOLN STA / TRF", 19) == 0) {
+        else if (strncmp(buf_+shift, "# OF SOLN STA / TRF", 19) == 0) {
             int n = atoi(buf_);
             sta_names_.reserve(n);
             // sta_poss_.reserve(n);
-        } else if (strncmp(buf_+60, "SOLN STA NAME / NUM", 19) == 0) {
+        } else if (strncmp(buf_+shift, "SOLN STA NAME / NUM", 19) == 0) {
             std::string name(buf_, 4);
             std::transform(name.begin(), name.end(), name.begin(),
                            [](unsigned char c) { return std::toupper(c); });
@@ -43,12 +55,12 @@ bool RinexClk::read(const std::string &path)
             // double x, y, z;
             // sscanf(buf_+14, "%lf %lf %lf", &x, &y, &z);
             // sta_poss_.emplace_back(x/1E3, y/1E3, z/1E3);
-        } else if (strncmp(buf_+60, "# OF SOLN SATS", 14) == 0) {
+        } else if (strncmp(buf_+shift, "# OF SOLN SATS", 14) == 0) {
             int n = atoi(buf_+3);
             ns = static_cast<size_t>(n);
             prns_.reserve(ns);
-        } else if (strncmp(buf_+60, "PRN LIST", 8) == 0) {
-            for (int i=0; i<15 && prns_.size()<ns; ++i) {
+        } else if (strncmp(buf_+shift, "PRN LIST", 8) == 0) {
+            for (int i=0; i<nprn_per_line && prns_.size()<ns; ++i) {
                 //if (buf[] == ' ') buf[] = '0';
                 //if (buf[] == ' ') buf[] = 'G';
                 prn.assign(buf_+4*i, 3);

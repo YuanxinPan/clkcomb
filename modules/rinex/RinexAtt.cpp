@@ -78,6 +78,7 @@ bool RinexAtt::read(const std::string &path)
                 }
             }
             std::sort(prns_.begin(), prns_.end());
+            prns_.erase(std::unique(prns_.begin(), prns_.end()), prns_.end());
             atts_.resize(prns_.size());
             // fprintf(stderr, "PRN SIZE %lu\n", prns_.size());
             // for (auto it=prns_.begin(); it!=prns_.end(); ++it)
@@ -170,10 +171,8 @@ bool RinexAtt::sat_att(MJD t, const std::string &prn, double *_q)const
     if (fabs(it->t - t) < 1E-3) { // 1 ms
         memcpy(q, it->q, sizeof(q));
     } else {
-        if (it+1 == atts_[iprn].end())
-            return false;
-        double dist = (t - it->t)/((it+1)->t - it->t);
-        quatern_interp(it->q, (it+1)->q, dist, q);
+        double dist = (t - (it-1)->t)/(it->t - (it-1)->t);
+        quatern_interp((it-1)->q, it->q, dist, q);
     }
 
     // quatern2rotmat(q, R); // ECEF => SV

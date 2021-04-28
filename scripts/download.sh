@@ -20,6 +20,16 @@ MSGWAR="\033[1;33mwarning:\033[0m"
 MSGINF="\033[1;34m::\033[0m"
 MSGSTA="\033[1;34m===>\033[0m"
 
+# HOST
+HOST="https://cddis.nasa.gov/archive"
+HOST="ftps://gdc.cddis.eosdis.nasa.gov"
+WUM_HOST="ftp://igs.ign.fr/pub/igs"
+WUM_HOST="ftp://igs.gnsswhu.cn/pub/gnss"
+
+# wget
+WGET_ARGS="--auth-no-challenge"                                     # https
+WGET_ARGS="--ftp-user anonymous --ftp-password yxpan@whu.edu.cn"    # ftps
+
 ######################################################################
 ##                     Funciton definations                         ##
 ######################################################################
@@ -65,9 +75,9 @@ DownloadGPSFloat() { # purpose: download float GPS clock/orbit for combination
         [ "$ac" = 'cod' ] && sp3=${sp3/sp3/eph}
         [ "$ac" = 'igs' ] && clk=${clk}_30s
 
-        url="https://cddis.nasa.gov/archive/gps/products/${week}/"
-        WgetDownload ${url}/${sp3}.Z "--auth-no-challenge" && uncompress ${sp3}.Z
-        WgetDownload ${url}/${clk}.Z "--auth-no-challenge" && uncompress ${clk}.Z
+        url="$HOST/gps/products/${week}"
+        WgetDownload $url/${sp3}.Z "$WGET_ARGS" && uncompress ${sp3}.Z
+        WgetDownload $url/${clk}.Z "$WGET_ARGS" && uncompress ${clk}.Z
 
         [ "$ac" = 'cod' -a -f "$sp3" ] && mv ${sp3} ${sp3/eph/sp3}
         [ "$ac" = 'igs' -a -f "$clk" ] && mv ${clk} ${clk%_30s}
@@ -86,14 +96,12 @@ DownloadGNSSFloat() { # purpose: download float multi-GNSS clock/orbit for combi
         [ $ac = esa ] && sp3=${sp3/MGX/MGN} && clk=${clk/MGX/MGN}
         [ $ac = wum -o $ac = grg ] && sp3=${sp3/05M/15M}
 
+        url="$HOST/gps/products/mgex/${week}"
+        [ $ac = 'esa' ] && url="http://navigation-office.esa.int/products/gnss-products/${week}"
+        [ $ac = 'wum' ] && url="$WUM_HOST/products/mgex/${week}"
 
-        url="https://cddis.nasa.gov/archive/gps/products/mgex/${week}/"
-        [ $ac = 'esa' ] && url="http://navigation-office.esa.int/products/gnss-products/${week}/"
-        # [ $ac = 'wum' ] && url="ftp://igs.ign.fr/pub/igs/products/mgex/${week}/"
-        [ $ac = 'wum' ] && url="ftp://igs.gnsswhu.cn/pub/gnss/products/mgex/${week}/"
-
-        WgetDownload ${url}/${sp3} "--auth-no-challenge" && gunzip -f ${sp3} && mv ${sp3%.gz} ${ac}${week}${dow}.sp3
-        WgetDownload ${url}/${clk} "--auth-no-challenge" && gunzip -f ${clk} && mv ${clk%.gz} ${ac}${week}${dow}.clk
+        WgetDownload $url/${sp3} "$WGET_ARGS" && gunzip -f ${sp3} && mv ${sp3%.gz} ${ac}${week}${dow}.sp3
+        WgetDownload $url/${clk} "$WGET_ARGS" && gunzip -f ${clk} && mv ${clk%.gz} ${ac}${week}${dow}.clk
     done
 }
 
@@ -101,14 +109,14 @@ DownloadGPSFixed() { # purpose: download GPS IRC bias/clock/orbit for combinatio
                      # usage  : DownloadGPSFixed
     local url sp3 clk bia
     # grg
-    url="https://cddis.nasa.gov/archive/gps/products/${week}/"
+    url="$HOST/gps/products/${week}"
     sp3="grg${week}${dow}.sp3"
     clk="grg${week}${dow}.clk"
-    WgetDownload ${url}/${sp3}.Z "--auth-no-challenge" && uncompress ${sp3}.Z
-    WgetDownload ${url}/${clk}.Z "--auth-no-challenge" && uncompress ${clk}.Z
+    WgetDownload $url/${sp3}.Z "$WGET_ARGS" && uncompress ${sp3}.Z
+    WgetDownload $url/${clk}.Z "$WGET_ARGS" && uncompress ${clk}.Z
 
     # COD
-    url="ftp://ftp.aiub.unibe.ch/CODE/${year}/"
+    url="ftp://ftp.aiub.unibe.ch/CODE/${year}"
     sp3="COD${week}${dow}.EPH"
     clk="COD${week}${dow}.CLK"
     bia="COD${week}${dow}.BIA"
@@ -117,7 +125,7 @@ DownloadGPSFixed() { # purpose: download GPS IRC bias/clock/orbit for combinatio
     WgetDownload ${url}/${bia}.Z && uncompress ${bia}.Z && mv $bia cod${week}${dow}.bia
 
     # whu
-    url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${year}/"
+    url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${year}"
     clk="WHU5IGSFIN_${year}${doy}0000_01D_30S_CLK.CLK"
     bia="WHU0IGSFIN_${year}${doy}0000_01D_01D_ABS.BIA"
     WgetDownload ${url}/clock/${clk}.Z && uncompress ${clk}.Z && mv $clk whu${week}${dow}.clk
@@ -128,14 +136,14 @@ DownloadGNSSFixed() { # purpose: download GNSS IRC bias/clock/orbit for combinat
                       # usage  : DownloadGNSSFixed
     local url sp3 clk bia
     # grg
-    url="https://cddis.nasa.gov/archive/gps/products/mgex/${week}/"
+    url="$HOST/gps/products/mgex/${week}"
     sp3="GRG0MGXFIN_${year}${doy}0000_01D_15M_ORB.SP3.gz"
     clk="GRG0MGXFIN_${year}${doy}0000_01D_30S_CLK.CLK.gz"
-    WgetDownload ${url}/${sp3} "--auth-no-challenge" && uncompress ${sp3} && mv ${sp3%.gz} grg${week}${dow}.sp3
-    WgetDownload ${url}/${clk} "--auth-no-challenge" && uncompress ${clk} && mv ${clk%.gz} grg${week}${dow}.clk
+    WgetDownload $url/${sp3} "$WGET_ARGS" && gunzip -f ${sp3} && mv ${sp3%.gz} grg${week}${dow}.sp3
+    WgetDownload $url/${clk} "$WGET_ARGS" && gunzip -f ${clk} && mv ${clk%.gz} grg${week}${dow}.clk
 
     # COD
-    url="ftp://ftp.aiub.unibe.ch/CODE_MGEX/CODE/${year}/"
+    url="ftp://ftp.aiub.unibe.ch/CODE_MGEX/CODE/${year}"
     sp3="COM${week}${dow}.EPH.Z"
     clk="COM${week}${dow}.CLK.Z"
     bia="COM${week}${dow}.BIA.Z"
@@ -144,22 +152,22 @@ DownloadGNSSFixed() { # purpose: download GNSS IRC bias/clock/orbit for combinat
     WgetDownload ${url}/${bia} && uncompress ${bia} && mv ${bia%.Z} cod${week}${dow}.bia
 
     # whu
-    url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${year}/"
+    url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${year}"
     clk="WHU5MGXFIN_${year}${doy}0000_01D_30S_CLK.CLK.Z"
     bia="WHU0MGXFIN_${year}${doy}0000_01D_01D_ABS.BIA.Z"
     WgetDownload ${url}/clock/${clk} && uncompress ${clk} && mv ${clk%.Z} whu${week}${dow}.clk
     WgetDownload ${url}/bias/${bia}  && uncompress ${bia} && mv ${bia%.Z} whu${week}${dow}.bia
 
-    # url="ftp://igs.ign.fr/pub/igs/products/mgex/${week}/"
-    url="ftp://igs.gnsswhu.cn/pub/gnss/products/mgex/${week}/"
-    sp3="WHU0MGXFIN_${year}${doy}0000_01D_15M_ORB.SP3.gz"
+    url="$WUM_HOST/products/mgex/${week}"
+    sp3="WUM0MGXFIN_${year}${doy}0000_01D_15M_ORB.SP3.gz"
     WgetDownload ${url}/${sp3} && gunzip ${sp3} && mv ${sp3%.gz} whu${week}${dow}.sp3
 }
 
 WgetDownload() { # purpose: download a file with wget
                  # usage  : WgetDownload url
     local url="$1"
-    local args="$2 -nv -N -t 3 --connect-timeout=10 --read-timeout=60"
+    # local args="$2 -nv -N -t 3 --connect-timeout=10 --read-timeout=60"
+    local args="$2 -nv -nc -c -t 3 --connect-timeout=10 --read-timeout=60"
     cmd="wget ${args} ${url}"
     $cmd
     [ -e $(basename "${url}") ] && return 0 || return 1

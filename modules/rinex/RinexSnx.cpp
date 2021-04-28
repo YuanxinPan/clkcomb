@@ -18,7 +18,7 @@ bool RinexSnx::read(const std::string &path)
     char buf[BUFSIZ];
     while (fgets(buf, sizeof(buf), fp)) {
         if (strncmp(buf, "+SITE/ID", 8) == 0) {
-            fgets(buf, sizeof(buf), fp);
+            // fgets(buf, sizeof(buf), fp);
             break;
         }
     }
@@ -28,6 +28,9 @@ bool RinexSnx::read(const std::string &path)
     while (fgets(buf, sizeof(buf), fp)) {
         if (strncmp(buf, "-SITE/ID", 8) == 0)
             break;
+        else if (strncmp(buf, "*CODE", 5) == 0)
+            continue;
+
         site.assign(buf+1, 4);
         dome.assign(buf+9, 9);
         std::transform(site.begin(), site.end(), site.begin(),
@@ -38,7 +41,7 @@ bool RinexSnx::read(const std::string &path)
     // ESTIMATE
     while (fgets(buf, sizeof(buf), fp)) {
         if (strncmp(buf, "+SOLUTION/ESTIMATE", 18) == 0) {
-            fgets(buf, sizeof(buf), fp);
+            // fgets(buf, sizeof(buf), fp);
             break;
         }
     }

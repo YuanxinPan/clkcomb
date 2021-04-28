@@ -89,7 +89,7 @@ bool AnalyseCenter::read_clock(const config_t &config, const RinexSp3 &refsp3,
             // Attitude correction
             if (config.use_att) {
                 if (!rnxatt_.sat_att(t, prns[isat], qs) || (!refatt.empty() && !refatt.sat_att(t, prns[isat], qr))) {
-                    clk = None; // try remove this, issue when read igs clock without att
+                    // clk = None; // try remove this, issue when read igs clock without att
                 } else {
                     if (refatt.empty()) { // use nominal attitude
                         SunPosition(t.d, t.sod, xsun);
@@ -137,8 +137,18 @@ bool AnalyseCenter::read_staclk(MJD t, int length, int interval,
     for (auto it=sta_clks.begin(); it!=sta_clks.end(); ++it)
         it->resize(nepo_total);
 
-    skip_header(fp);
+
     char buf[BUFSIZ];
+    fgets(buf, sizeof(buf), fp);
+    double version = atof(buf);
+    int shift = 60;
+    if (version>3.03)
+        shift = 65;
+    skip_header(fp, shift);
+
+    shift = 8;
+    if (version>3.03)
+        shift = 12;
     int y, m, d, h, min, n, epo;
     double s, sod, bias;
     std::string site;
@@ -152,7 +162,7 @@ bool AnalyseCenter::read_staclk(MJD t, int length, int interval,
                         [](unsigned char c) { return std::toupper(c); });
         if (!std::binary_search(sta_list.begin(), sta_list.end(), site))
             continue;
-        sscanf(buf+8, "%d %d %d %d %d %lf %d %lf", &y, &m, &d, &h, &min, &s, &n, &bias);
+        sscanf(buf+shift, "%d %d %d %d %d %lf %d %lf", &y, &m, &d, &h, &min, &s, &n, &bias);
         if (n > 2) {
             fprintf(stderr, MSG_ERR "RinexClk::open: n>2\n");
             return false;
@@ -329,7 +339,7 @@ bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::st
             have_bias[isat] = 1;
         }
 
-        if (count != 0 && name == "tug") {
+        if (count != 0 && (name=="tug" || name=="cne" && prns[isat]!="G23")) {
             const RinexAtx::atx_t *atx = rnxatx_.atx(mjd, prns[isat]);
             if (atx == nullptr)
                 continue;
@@ -348,7 +358,7 @@ bool AnalyseCenter::read_bias(const std::string &path, const std::vector<std::st
             double cor = pco[0][2]/lamd[0] - pco[1][2]/lamd[1] - (pco[0][2]*coef[0] + pco[1][2]*coef[1])/lamd[2];
             int integer = static_cast<int>(cor);
             double wcor = cor - integer;
-            fprintf(stdout, "PCO %3s %8.3f %8.3f\n", prns[isat].c_str(), cor, wcor);
+            // fprintf(stdout, "PCO %3s %8.3f %8.3f\n", prns[isat].c_str(), cor, wcor);
             wl_bias[isat] -= wcor;
         }
     }

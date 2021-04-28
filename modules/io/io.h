@@ -26,7 +26,7 @@
 void skip_nline(FILE *fp, int n);
 
 // skip header of RINEX format files
-void skip_header(FILE *fp);
+void skip_header(FILE *fp, int shift=60);
 
 //void skip_nline(std::ifstream &in, int n);
 
