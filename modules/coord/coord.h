@@ -44,8 +44,8 @@ void rot_enu2ecef(const double *xyz, double *R);
 // R: rotation matrix, column major
 void rot_ecef2enu(const double *xyz, double *R);
 
-void SunPosition(int jd, double sod, double rs[]);
-void MoonPosition(int jd, double sod, double rm[]);
+void SunPosition(int mjd, double sod, double rs[]);
+void MoonPosition(int mjd, double sod, double rm[]);
 
 void nominal_att(const double *xsat, const double *xsun, double *q);
 

@@ -2,7 +2,6 @@
 #define RINEXCLK_H
 
 #include "../chrono/chrono.h"
-// #include "../coord/coord.h"
 
 #include <stdio.h>
 #include <array>

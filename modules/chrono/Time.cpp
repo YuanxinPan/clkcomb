@@ -64,8 +64,7 @@ bool MJD::read_leapsec(const std::string &path)
         return true;
     FILE *fp = fopen(path.c_str(), "r");
     if (fp == nullptr) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "MJD::read_leapsec: no such file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR "MJD::read_leapsec: no such file: %s\n", path.c_str());
         return false;
     }
 
@@ -86,8 +85,7 @@ int MJD::leapsec(double t)
 {
     t = static_cast<int>(t);  // only doy-part matters
 	if (t < leapsecs_.front().t || t > leapsecs_.back().t) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "CoordConverter::leapsec: request time %7.1f "
+        fprintf(stderr, MSG_ERR "CoordConverter::leapsec: request time %7.1f "
                 "is out of range [%7.1f, %7.1f]\n", t,
                 leapsecs_.front().t, leapsecs_.back().t);
         return 0;

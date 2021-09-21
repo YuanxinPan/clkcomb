@@ -19,7 +19,7 @@ public:
         std::string svn_;
         std::string blk_;
         int nfreq;
-        std::vector<std::string> freq;
+        std::vector<std::string> freqs;
         std::vector<std::array<double,3>> pcos;  // nfreq
         double dazi;
         double dzen, zen1, zen2;

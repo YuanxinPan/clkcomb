@@ -108,7 +108,7 @@ void xyz2blh(const double xyz[], double blh[])
         N = WGS84.a/sqrt(1 - e2*sinB*sinB);
         H = r/cos(B) - N;
         B = atan(z/r/(1 - e2*N/(N+H)));
-    } while(fabs(B-B0) > 1.E-12);   // 1E-10 -> 0.64 mm 
+    } while(fabs(B-B0) > 1.E-12);   // 1E-10 -> 0.64 mm
 
     blh[0]=B;
     blh[2]=H;

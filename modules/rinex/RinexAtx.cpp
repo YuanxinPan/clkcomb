@@ -10,9 +10,9 @@
 
 bool RinexAtx::atx_t::pco(const std::string &f, double *pco)const
 {
-    auto it = std::find(freq.begin(), freq.end(), f);
-    int i = it - freq.begin();
-    if (it == freq.end())
+    auto it = std::find(freqs.begin(), freqs.end(), f);
+    int i = it - freqs.begin();
+    if (it == freqs.end())
         return false;
 
     memcpy(pco, pcos[i].data(), 3*sizeof(double));
@@ -58,10 +58,10 @@ void RinexAtx::atx_t::pco(double *pco, const std::string &f1, const std::string 
     double coef[2] = { f[0]*f[0]/tmp, -f[1]*f[1]/tmp };
 
     int i=0, j=0;
-    auto it = std::find(freq.begin(), freq.end(), f1);
-    i = it - freq.begin();
-    it = std::find(freq.begin(), freq.end(), f2);
-    j = it - freq.begin();
+    auto it = std::find(freqs.begin(), freqs.end(), f1);
+    i = it - freqs.begin();
+    it = std::find(freqs.begin(), freqs.end(), f2);
+    j = it - freqs.begin();
 
     // fprintf(stderr, "%3s %3s:%2d %3s:%2d\n", name.c_str(), f1.c_str(), i, f2.c_str(), j);
 
@@ -131,8 +131,7 @@ bool RinexAtx::open(const std::string &path)
     }
     atxFile_ = fopen(path.c_str(), "r");
     if (atxFile_ == nullptr) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexAtx::read: no such file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR "RinexAtx::read: no such file: %s\n", path.c_str());
         return false;
     }
 
@@ -141,8 +140,7 @@ bool RinexAtx::open(const std::string &path)
     fgets(buf, sizeof(buf), atxFile_);
     fgets(buf, sizeof(buf), atxFile_);
     if (buf[0] != 'A') {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexAtx::read: not an absolute atx: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR "RinexAtx::read: not an absolute atx: %s\n", path.c_str());
         return false;
     }
     atxs_.reserve(150);
@@ -172,8 +170,7 @@ const RinexAtx::atx_t *RinexAtx::atx(MJD t, const std::string &ant)const
             return &atxs_.back();
         }
     }
-    fprintf(stdout, ANSI_BOLD_YELLOW "warning: " ANSI_RESET
-            "RinexAtx::atx:: no %s\n", ant.c_str());
+    fprintf(stdout, MSG_WAR "RinexAtx::atx:: no %s\n", ant.c_str());
     return nullptr;
 }
 
@@ -188,9 +185,9 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)const
     CalendTime calend;
     while (fgets(buf, sizeof(buf), atxFile_))
     {
-        if (strncmp(buf+60, "START OF ANTENNA", 16) == 0)
+        if (strncmp(buf+60, "START OF ANTENNA", 16) == 0) {
             beg = end = MJD();
-        else if (strncmp(buf+60, "TYPE / SERIAL NO", 16) == 0) {
+        } else if (strncmp(buf+60, "TYPE / SERIAL NO", 16) == 0) {
             if (issatatx && buf[20]==' ')
                 break;
             else if (!issatatx && buf[20]!=' ')
@@ -206,26 +203,23 @@ bool RinexAtx::find_atx(MJD t, const std::string &ant, atx_t &atx)const
                 atx.svn_.assign(buf+40, 4);
                 atx.blk_.assign(buf, 12);
             }
-        }
-        else if (strncmp(buf+60, "DAZI", 4) == 0)
+        } else if (strncmp(buf+60, "DAZI", 4) == 0) {
             sscanf(buf, "%lf", &atx.dazi);
-        else if (strncmp(buf+60, "ZEN1 / ZEN2 / DZEN", 18) == 0)
+        } else if (strncmp(buf+60, "ZEN1 / ZEN2 / DZEN", 18) == 0) {
             sscanf(buf, "%lf%lf%lf", &atx.zen1, &atx.zen2, &atx.dzen);
-        else if (strncmp(buf+60, "# OF FREQUENCIES", 16) == 0)
+        } else if (strncmp(buf+60, "# OF FREQUENCIES", 16) == 0) {
             sscanf(buf, "%d", &atx.nfreq);
-        else if (strncmp(buf+60, "VALID FROM", 10) == 0) {
+        } else if (strncmp(buf+60, "VALID FROM", 10) == 0) {
             calend.read(buf);
             beg = calend;
             if (beg > t)
                 skip_atx(atxFile_);
-        }
-        else if (strncmp(buf+60, "VALID UNTIL", 11) == 0) {
+        } else if (strncmp(buf+60, "VALID UNTIL", 11) == 0) {
             calend.read(buf);
             end = calend;
             if (end < t)
                 skip_atx(atxFile_);
-        }
-        else if (strncmp(buf+60, "SINEX CODE", 10) == 0) {
+        } else if (strncmp(buf+60, "SINEX CODE", 10) == 0) {
             read_atx(atxFile_, atx);
             //int year, doy;
             //mjd2doy(beg.d, &year, &doy);
@@ -241,7 +235,7 @@ void RinexAtx::read_atx(FILE *fp, atx_t &atx)const
     int nzen = static_cast<int>((atx.zen2-atx.zen1)/atx.dzen) + 1;
     int nazi = atx.dazi==0.0 ? 1 : static_cast<int>(360.0/atx.dazi) + 2;  // NOAZI
 
-    atx.freq.reserve(atx.nfreq);
+    atx.freqs.reserve(atx.nfreq);
     atx.pcos.reserve(atx.nfreq);
     atx.pcvs.reserve(atx.nfreq);
 
@@ -255,10 +249,9 @@ void RinexAtx::read_atx(FILE *fp, atx_t &atx)const
     while (fgets(buf, sizeof(buf), fp))
     {
         if (strncmp(buf+60, "START OF FREQUENCY", 18) == 0) {
-            atx.freq.emplace_back(buf+3, 3);
+            atx.freqs.emplace_back(buf+3, 3);
             table.clear();
-        }
-        else if (strncmp(buf+60, "NORTH / EAST / UP", 17) == 0) {
+        } else if (strncmp(buf+60, "NORTH / EAST / UP", 17) == 0) {
             // read PCO
             sscanf(buf, "%lf%lf%lf", &pco[0], &pco[1], &pco[2]);
             pco[0]/=1000; pco[1]/=1000; pco[2]/=1000; // unit: mm => m
@@ -287,7 +280,7 @@ void RinexAtx::read_atx(FILE *fp, atx_t &atx)const
 
 void RinexAtx::skip_atx(FILE *fp)const
 {
-    static char buf[BUFSIZ];
+    char buf[BUFSIZ];
     while (fgets(buf, sizeof(buf), fp) &&
            strncmp(buf+60, "END OF ANTENNA", 14) != 0);
 }

@@ -17,8 +17,7 @@ bool RinexSp3::read(const std::string &path)
 {
     FILE *fp = fopen(path.c_str(), "r");
     if (fp == nullptr) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexSp3::read: no such file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR "RinexSp3::read: no such file: %s\n", path.c_str());
         return false;
     }
 
@@ -26,8 +25,7 @@ bool RinexSp3::read(const std::string &path)
     int nline = 0;
     char buf[128];
     std::string prn;
-
-    while (fgets(buf, sizeof(buf), fp) && buf[0]!='*') {
+    while (fgets(buf, sizeof(buf), fp) && buf[0] != '*') {
         ++nline;
         if (nline == 3) {
             ns = static_cast<size_t>(atoi(buf+3));
@@ -58,8 +56,7 @@ bool RinexSp3::read(const std::string &path)
         if (buf[0] == '*') {
             int n = sscanf(buf+1, "%d%d%d%d%d%lf", &y, &m, &d, &h, &min, &s);
             if (n != 6) {
-                fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                        "RinexSp3::read: %s", buf);
+                fprintf(stderr, MSG_ERR "RinexSp3::read: %s", buf);
                 return false;
             }
             sp3.t.d = date2mjd(y, m, d);
@@ -67,12 +64,11 @@ bool RinexSp3::read(const std::string &path)
         } else {
             int n = sscanf(buf+4, "%lf%lf%lf", &sp3.pos.x, &sp3.pos.y, &sp3.pos.z);
             if (n != 3) {
-                fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                        "RinexSp3::read: %s", buf);
+                fprintf(stderr, MSG_ERR "RinexSp3::read: %s", buf);
                 return false;
-            }
-            if (sp3.pos.norm() < MaxWnd || isnan(sp3.pos.x+sp3.pos.y+sp3.pos.z))
+            } else if (sp3.pos.norm() < MaxWnd || isnan(sp3.pos.x+sp3.pos.y+sp3.pos.z)) {
                 continue;
+            }
 
             prn.assign(buf+1, 3);
             if (prn[0] == ' ') prn[0] = 'G';

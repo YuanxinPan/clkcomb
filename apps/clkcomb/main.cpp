@@ -96,12 +96,11 @@ int main(int argc, char *argv[])
                     continue;
                 }
                 double val = it->nl_bias[i]*(1E9/freq); // ns
-                val = it->name=="grg" ? val : -val;
                 // fprintf(g_logfile, "NL %3s %4s %8.3f %8.3f %8.3f\n", sats[i].prn.c_str(), it->name.c_str(), it->wl_bias[i], it->nl_bias[i], val);
                 for (size_t epo=0; epo!=nepo_total; ++epo) {
                     if (it->sat_clks[i][epo] == None)
                         continue;
-                    it->sat_clks[i][epo] += val;
+                    it->sat_clks[i][epo] -= val;
                 }
             }
         }

@@ -20,8 +20,7 @@ bool RinexClk::read(const std::string &path)
 {
     clkFile_ = fopen(path.c_str(), "r");
     if (clkFile_ == nullptr) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexClk::open: no such file: %s\n", path.c_str());
+        fprintf(stderr, MSG_ERR "RinexClk::open: no such file: %s\n", path.c_str());
         return false;
     }
 
@@ -61,8 +60,6 @@ bool RinexClk::read(const std::string &path)
             prns_.reserve(ns);
         } else if (strncmp(buf_+shift, "PRN LIST", 8) == 0) {
             for (int i=0; i<nprn_per_line && prns_.size()<ns; ++i) {
-                //if (buf[] == ' ') buf[] = '0';
-                //if (buf[] == ' ') buf[] = 'G';
                 prn.assign(buf_+4*i, 3);
                 prns_.push_back(prn);
             }
@@ -77,8 +74,7 @@ bool RinexClk::read(const std::string &path)
     // fflush(stdout);
 
     if (prns_.size() == 0u) {
-        fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                "RinexClk::open: no PRN LIST\n");
+        fprintf(stderr, MSG_ERR "RinexClk::open: no PRN LIST\n");
         return false;
     }
     std::sort(prns_.begin(), prns_.end());
@@ -95,8 +91,7 @@ bool RinexClk::read(const std::string &path)
             continue;
         sscanf(buf_+7, "%d %d %d %d %d %lf %d %lf", &y, &m, &d, &h, &min, &s, &n, &bias);
         if (n > 2) {
-            fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                    "RinexClk::open: n>2\n");
+            fprintf(stderr, MSG_ERR "RinexClk::open: n>2\n");
             exit(1);
         }
         cur.d = date2mjd(y, m, d);
@@ -167,8 +162,7 @@ bool RinexClk::update()
             continue;
         sscanf(buf_+7, "%d %d %d %d %d %lf %d %lf", &y, &m, &d, &h, &min, &s, &n, &bias);
         if (n > 2) {
-            fprintf(stderr, ANSI_BOLD_RED "error: " ANSI_RESET
-                    "RinexClk::open: n>2\n");
+            fprintf(stderr, MSG_ERR "RinexClk::open: n>2\n");
             exit(1);
         }
         cur.d = date2mjd(y, m, d);

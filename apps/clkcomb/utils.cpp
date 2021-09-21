@@ -796,7 +796,7 @@ void remove_clkbias_seg(const std::string &ac_name, const Satellite &sat, const 
     }
     segs.push_back(sat_clks.size());
     std::sort(segs.begin(), segs.end());
-    std::unique(segs.begin(), segs.end());
+    segs.erase(std::unique(segs.begin(), segs.end()), segs.end());
 
     int beg = 0;
     for (auto it=segs.begin(); it!=segs.end(); ++it) {
