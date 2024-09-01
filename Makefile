@@ -4,7 +4,7 @@
 
 DIR_GUARD = @mkdir -p $(@D)
 BIN_PATH = ./bin/
-OBJ_PATH = ./bin/obj/
+OBJ_PATH = $(BIN_PATH)/obj/
 
 SUBDIR = modules \
 	     apps
@@ -16,7 +16,7 @@ all : $(SUBDIR)
 apps utils : modules
 
 $(SUBDIR) :
-	make -j4 -C $@
+	make -j4 -C src/$@
 
 clean :
-	-rm -r $(BIN_PATH)
+	-rm -rf $(BIN_PATH)

@@ -37,7 +37,7 @@ The executables will be generated in the `bin/` directory.
 
 ### Windows
 
-Open `vc++/clkcomb.sln` with Visual Studio (version 2013 or later).
+Open `src/vc++/clkcomb.sln` with Visual Studio (version 2013 or later).
 Please note that the program has not yet been tested on Windows.
 
 

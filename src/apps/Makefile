@@ -3,30 +3,25 @@
 # All rights reserved.
 
 DIR_GUARD = @mkdir -p $(@D)
-BIN_PATH = ../bin/
-OBJ_PATH = ../bin/obj/modules/
+BIN_PATH = ../../bin/
+OBJ_PATH = $(BIN_PATH)/obj/apps/
 
-TARGET := $(BIN_PATH)libmods.a
+MODULE := att clkcomb
+          
+TARGET := $(addprefix $(BIN_PATH), $(MODULE))
 all : $(TARGET)
 
 CC = g++
-CPPFALGS = -Wall -g -O3 -I../include -std=c++11
+CPPFALGS = -Wall -g -O3 -I../modules/ -std=c++11
 DEBUG = 
+LIB = $(BIN_PATH)libmods.a
 
-MODULE := chrono \
-		  coord \
-		  io \
-		  rinex
 VPATH := $(MODULE)
-OBJ := 
+OBJ :=
 include $(addsuffix /Module.mk, $(MODULE))
-OBJ :=  $(addprefix $(OBJ_PATH), $(OBJ))
+OBJ := $(addprefix $(OBJ_PATH), $(OBJ))
 
-$(TARGET) : $(OBJ)
-	$(DIR_GUARD)
-	ar -rv $(TARGET) $(OBJ)
-
-$(OBJ_PATH)%.o : %.cpp
+$(OBJ_PATH)%.o : $(SRC_PATH)%.cpp
 	$(DIR_GUARD)
 	$(CC) $(CPPFALGS) $(DEBUG) -c $< -o $@
 	@$(CC) -MM $(CPPFALGS) $< | \
@@ -34,7 +29,7 @@ $(OBJ_PATH)%.o : %.cpp
 
 .PHONY : clean
 clean :
-	-rm $(TARGET) $(OBJ_PATH)*
+	-rm -f $(TARGET) $(OBJ_PATH)*
 
 -include $(OBJ:.o=.d)
 

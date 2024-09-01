@@ -1,6 +1,6 @@
 DIR_GUARD = @mkdir -p $(@D)
-BIN_PATH = ../bin/
-OBJ_PATH = ../bin/obj/utils/
+BIN_PATH = ../../bin/
+OBJ_PATH = $(BIN_PATH)/obj/utils/
 
 EXE := fip2snx grg2snx sgg2snx zqy2snx
 TARGET := $(addprefix $(BIN_PATH), $(EXE))
