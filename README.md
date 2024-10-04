@@ -18,6 +18,9 @@ The following publications are based on this software (or an updated version of 
   All-frequency IGS phase clock/bias product combination to improve PPP
   ambiguity resolution. J Geod 98(6), 48.
   https://doi.org/10.1007/s00190-024-01865-y
+- Yuanxin Pan. (2021) BDS/GNSS clock and phase bias products combination for precise
+  point positioning with ambiguity resolution. [Master thesis, Wuhan University].
+  China National Knowledge Infrastructure. https://doi.org/10.27379/d.cnki.gwhdu.2021.000240
 
 
 ## Installation
@@ -34,18 +37,55 @@ cd clkcomb && make
 
 The executables will be generated in the `bin/` directory.
 
-
 ### Windows
 
 Open `src/vc++/clkcomb.sln` with Visual Studio (version 2013 or later).
 Please note that the program has not yet been tested on Windows.
 
 
-## Running the tests
+## Usage
 
-An example is provided in the
-[PPPx\_bin](https://github.com/YuanxinPan/PPPx_bin/tree/main/example/clkcomb)
-repository to help you get started.
+1. Download IGS products for each analysis center:
+    - sp3: precise satellite orbits
+    - clk: precise satellite clocks
+    - [bia]: satllite phase biases
+    - [obx]: satellite attitudes
+
+> The sp3 of the second day will be needed if the 24:00 epoch is not included in the sp3 of current day
+
+2. Modify the configuration file [comb.ini](comb.ini)
+    - session time
+    - GNSS constellations
+    - path to AC products
+    - ...
+
+3. Execute the program
+
+```shell
+./bin/clkcomb comb.ini
+```
+
+4. Visualization
+
+```shell
+bash scripts/plot_clkdif.sh dif_file log_file
+```
+
+
+## Running the test
+
+To help you get started, an example is provided in the folder `example`.
+Run the following commands to conduct a combination test of GPS clock products:
+
+```shell
+cd example/clkcomb/
+./run.sh    # combination & plotting
+```
+
+For example, here is the comparison of G21 satellite clocks among different
+analysis centers (2022-001):
+
+<img src="example/output/G21.png" width="500">
 
 
 ## Contributing
